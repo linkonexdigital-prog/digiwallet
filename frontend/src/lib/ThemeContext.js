@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 
 const ThemeCtx = createContext(null);
@@ -40,15 +40,16 @@ export const ThemeProvider = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <ThemeCtx.Provider value={{
+  const value = useMemo(
+    () => ({
       theme, setTheme,
       colorTheme, setColorTheme,
       toggle: () => setTheme(theme === "dark" ? "light" : "dark"),
       validColorThemes: VALID_COLOR_THEMES,
-    }}>
-      {children}
-    </ThemeCtx.Provider>
+    }),
+    [theme, colorTheme]
   );
+
+  return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
 };
 export const useTheme = () => useContext(ThemeCtx);

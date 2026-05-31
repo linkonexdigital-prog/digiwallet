@@ -1,8 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api, { fmtErr } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { Lock, User as UserIcon, TelegramLogo, PaperPlaneTilt, FloppyDisk, BellRinging, CheckCircle, BellSlash } from "@phosphor-icons/react";
 import { subscribeForPush, unsubscribeFromPush, getPushStatus, sendTestPush } from "@/lib/webPush";
+
+const renderPushBadge = (pushStatus) => {
+  if (pushStatus.subscribed) {
+    return <span className="pill pill-success inline-flex items-center gap-1"><CheckCircle size={12}/> Active</span>;
+  }
+  if (pushStatus.permission === "denied") {
+    return <span className="pill pill-rejected inline-flex items-center gap-1"><BellSlash size={12}/> Blocked</span>;
+  }
+  return <span className="pill pill-info">Not enabled</span>;
+};
 
 export default function Settings() {
   const { user, refresh } = useAuth();
@@ -15,12 +25,14 @@ export default function Settings() {
   const [pushBusy, setPushBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState({ supported: false, permission: "default", subscribed: false });
 
-  const refreshPush = async () => setPushStatus(await getPushStatus());
+  const refreshPush = useCallback(async () => setPushStatus(await getPushStatus()), []);
 
   useEffect(() => {
-    api.get("/auth/me").then((r) => setTgChat(r.data.telegram_chat_id || "")).catch(() => {});
+    api.get("/auth/me")
+      .then((r) => setTgChat(r.data.telegram_chat_id || ""))
+      .catch((e) => { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); });
     refreshPush();
-  }, []);
+  }, [refreshPush]);
 
   const submitPw = async (e) => {
     e.preventDefault();
@@ -111,13 +123,7 @@ export default function Settings() {
               <p className="text-xs text-muted-foreground mt-1 max-w-md">Real-time notifications on your phone or computer — even when DigiWallet is closed in another tab or completely shut down.</p>
             </div>
           </div>
-          {pushStatus.subscribed ? (
-            <span className="pill pill-success inline-flex items-center gap-1"><CheckCircle size={12}/> Active</span>
-          ) : pushStatus.permission === "denied" ? (
-            <span className="pill pill-rejected inline-flex items-center gap-1"><BellSlash size={12}/> Blocked</span>
-          ) : (
-            <span className="pill pill-info">Not enabled</span>
-          )}
+          {renderPushBadge(pushStatus)}
         </div>
         <div className="flex gap-2 flex-wrap">
           {!pushStatus.subscribed ? (

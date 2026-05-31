@@ -8,8 +8,8 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://fintech-v2.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_MOBILE = "9999999999"
-ADMIN_PASSWORD = "Admin@123"
+ADMIN_MOBILE = os.environ.get("DW_TEST_ADMIN_MOBILE", "9999999999")
+ADMIN_PASSWORD = os.environ.get("DW_TEST_ADMIN_PASSWORD", "Admin@123")
 
 
 def _rand_mobile():

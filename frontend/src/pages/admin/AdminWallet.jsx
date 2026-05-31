@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api, { inr, fmtErr } from "@/lib/api";
 import { ArrowDownLeft, ArrowUpRight, Equals, ArrowUUpLeft } from "@phosphor-icons/react";
 
@@ -13,11 +13,11 @@ export default function AdminWallet() {
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
   const [txs, setTxs] = useState([]);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     const r = await api.get("/admin/users", { params: { q: q || undefined, limit: 30 } });
     setUsers(r.data.items);
-  };
-  useEffect(() => { const id = setTimeout(loadUsers, 300); return () => clearTimeout(id); }, [q]);
+  }, [q]);
+  useEffect(() => { const id = setTimeout(loadUsers, 300); return () => clearTimeout(id); }, [loadUsers]);
 
   const loadTx = async (uid) => {
     const r = await api.get(`/admin/users/${uid}`);

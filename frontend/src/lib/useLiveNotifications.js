@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { ensureSWRegistered } from "@/lib/webPush";
 
@@ -26,7 +26,28 @@ export function useLiveNotifications(enabled = true) {
     return p;
   };
 
-  const showNotification = async (n) => {
+  // Simple WebAudio ping (subtle confirm sound)
+  const playPing = useCallback(() => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ac = new Ctx();
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.type = "sine"; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.35);
+      o.start(); o.stop(ac.currentTime + 0.4);
+      setTimeout(() => {
+        try { ac.close(); }
+        catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw] audio close", e); }
+      }, 600);
+    } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
+  }, []);
+
+  const showNotification = useCallback(async (n) => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const opts = {
       body: n.message,
@@ -53,25 +74,7 @@ export function useLiveNotifications(enabled = true) {
       bn.onclick = () => { window.focus(); window.location.href = "/app/notifications"; };
       playPing();
     } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
-  };
-
-  // Simple WebAudio ping (subtle confirm sound)
-  const playPing = () => {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      const ac = new Ctx();
-      const o = ac.createOscillator();
-      const g = ac.createGain();
-      o.connect(g); g.connect(ac.destination);
-      o.type = "sine"; o.frequency.value = 880;
-      g.gain.setValueAtTime(0.0001, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.35);
-      o.start(); o.stop(ac.currentTime + 0.4);
-      setTimeout(() => { try { ac.close(); } catch (_){} }, 600);
-    } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
-  };
+  }, [playPing]);
 
   // Ensure SW is registered ASAP
   useEffect(() => { ensureSWRegistered(); }, []);
@@ -114,7 +117,7 @@ export function useLiveNotifications(enabled = true) {
     tick();
     const i = setInterval(tick, 5000); // 5s for near-real-time
     return () => { alive = false; clearInterval(i); };
-  }, [enabled]);
+  }, [enabled, showNotification]);
 
   return { unread, requestPermission, permission };
 }

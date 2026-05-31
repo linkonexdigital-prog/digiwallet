@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api, { fmtErr } from "@/lib/api";
 
 const AuthCtx = createContext(null);
@@ -64,11 +64,12 @@ export const AuthProvider = ({ children }) => {
     window.location.href = "/admin";
   };
 
-  return (
-    <AuthCtx.Provider value={{ user, setUser, error, login, register, logout, refresh, loginAs, restoreAdmin }}>
-      {children}
-    </AuthCtx.Provider>
+  const value = useMemo(
+    () => ({ user, setUser, error, login, register, logout, refresh, loginAs, restoreAdmin }),
+    [user, error]
   );
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 };
 
 export const useAuth = () => useContext(AuthCtx);

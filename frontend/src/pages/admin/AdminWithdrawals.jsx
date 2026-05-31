@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api, { inr, fmtErr } from "@/lib/api";
 import { Download, Check, X as XIcon, Money } from "@phosphor-icons/react";
 
@@ -11,12 +11,11 @@ export default function AdminWithdrawals() {
   const [selected, setSelected] = useState([]);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const r = await api.get("/admin/withdrawals", { params: { status: status || undefined, q: q || undefined, limit: 200 } });
     setItems(r.data.items); setSelected([]);
-  };
-  useEffect(() => { load(); }, [status]);
-  useEffect(() => { const id = setTimeout(load, 350); return () => clearTimeout(id); }, [q]);
+  }, [status, q]);
+  useEffect(() => { const id = setTimeout(load, 350); return () => clearTimeout(id); }, [load]);
 
   const action = async (id, act) => {
     setErr(""); setMsg("");

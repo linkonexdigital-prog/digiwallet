@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { inr, fmtErr } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
@@ -16,12 +16,11 @@ export default function AdminUsers() {
   const { loginAs } = useAuth();
   const nav = useNavigate();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const r = await api.get("/admin/users", { params: { q: q || undefined, status: status || undefined, limit: 100 } });
     setItems(r.data.items);
-  };
-  useEffect(() => { load(); }, []);
-  useEffect(() => { const id = setTimeout(load, 350); return () => clearTimeout(id); }, [q, status]);
+  }, [q, status]);
+  useEffect(() => { const id = setTimeout(load, 350); return () => clearTimeout(id); }, [load]);
 
   const openUser = async (id) => {
     setSelected(id); setMsg(""); setErr("");

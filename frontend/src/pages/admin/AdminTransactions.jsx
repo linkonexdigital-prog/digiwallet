@@ -1,8 +1,30 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api, { inr, fmtErr } from "@/lib/api";
 import { MagnifyingGlass, Download, ArrowDownLeft, ArrowUpRight, Equals, X, Flag, FloppyDisk, ArrowUUpLeft, Receipt, User as UserIcon } from "@phosphor-icons/react";
 
 const TYPES = ["", "credit", "withdrawal", "debit", "adjustment", "reversal"];
+
+const isOutflow = (type) => type === "withdrawal" || type === "debit";
+
+const typeIconWrap = (type) => {
+  if (type === "credit") return "bg-success/10 text-success";
+  if (isOutflow(type)) return "bg-destructive/10 text-destructive";
+  return "bg-warning/10 text-warning";
+};
+
+const typeIcon = (type, size = 12) => {
+  if (type === "credit") return <ArrowDownLeft size={size}/>;
+  if (isOutflow(type)) return <ArrowUpRight size={size}/>;
+  return <Equals size={size}/>;
+};
+
+const pillType = (type) => (type === "debit" ? "withdrawal" : type);
+
+const amountColor = (type) => {
+  if (type === "credit") return "text-success";
+  if (isOutflow(type)) return "text-destructive";
+  return "";
+};
 
 export default function AdminTransactions() {
   const [items, setItems] = useState([]);
@@ -15,7 +37,7 @@ export default function AdminTransactions() {
   const [edit, setEdit] = useState({});
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -24,10 +46,9 @@ export default function AdminTransactions() {
       const r = await api.get("/admin/transactions", { params });
       setItems(r.data.items); setTotal(r.data.total); setSummary(r.data.summary);
     } finally { setLoading(false); }
-  };
+  }, [filters]);
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { const t = setTimeout(load, 400); return () => clearTimeout(t); }, [filters]);
+  useEffect(() => { const t = setTimeout(load, 400); return () => clearTimeout(t); }, [load]);
 
   const openTx = async (id) => {
     setMsg(""); setErr("");
@@ -119,17 +140,17 @@ export default function AdminTransactions() {
                   </td>
                   <td>
                     <span className="flex items-center gap-2">
-                      <span className={`w-7 h-7 rounded-md flex items-center justify-center ${t.type === "credit" ? "bg-success/10 text-success" : t.type === "withdrawal" || t.type === "debit" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"}`}>
-                        {t.type === "credit" ? <ArrowDownLeft size={12}/> : t.type === "withdrawal" || t.type === "debit" ? <ArrowUpRight size={12}/> : <Equals size={12}/>}
+                      <span className={`w-7 h-7 rounded-md flex items-center justify-center ${typeIconWrap(t.type)}`}>
+                        {typeIcon(t.type)}
                       </span>
-                      <span className={`pill pill-${t.type === "debit" ? "withdrawal" : t.type}`}>{t.type}</span>
+                      <span className={`pill pill-${pillType(t.type)}`}>{t.type}</span>
                     </span>
                   </td>
                   <td>
                     <div className="text-sm font-semibold truncate max-w-[140px]">{t.user_name || "—"}</div>
                     <div className="mono text-xs text-muted-foreground">{t.user_mobile || ""}</div>
                   </td>
-                  <td className={`mono font-bold ${t.type === "credit" ? "text-success" : t.type === "withdrawal" || t.type === "debit" ? "text-destructive" : ""}`}>₹{inr(t.amount)}</td>
+                  <td className={`mono font-bold ${amountColor(t.type)}`}>₹{inr(t.amount)}</td>
                   <td><span className={`pill pill-${t.status}`}>{t.status}</span></td>
                   <td className="max-w-[200px] truncate text-xs">{t.description}</td>
                   <td className="mono text-xs text-muted-foreground whitespace-nowrap">{new Date(t.created_at).toLocaleString()}</td>

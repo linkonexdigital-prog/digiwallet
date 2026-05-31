@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api, { fmtErr } from "@/lib/api";
 import { Plus, Trash, Pause, Play, Copy, Check } from "@phosphor-icons/react";
 
@@ -11,12 +11,11 @@ export default function AdminApi() {
   const [copied, setCopied] = useState("");
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [a, b] = await Promise.all([api.get("/admin/api-keys"), api.get("/admin/api-logs", { params: { status: logFilter || undefined, limit: 200 } })]);
     setKeys(a.data); setLogs(b.data);
-  };
-  useEffect(() => { load(); }, []);
-  useEffect(() => { load(); }, [logFilter]);
+  }, [logFilter]);
+  useEffect(() => { load(); }, [load]);
 
   const create = async (e) => {
     e.preventDefault();
@@ -124,7 +123,7 @@ function GatewayUrlPanel({ keys }) {
   const [copied, setCopied] = React.useState(false);
   React.useEffect(() => {
     if (keys?.length && !selectedKey) setSelectedKey(keys[0].key);
-  }, [keys]);
+  }, [keys, selectedKey]);
 
   const base = `${process.env.REACT_APP_BACKEND_URL}/api`;
   const k = selectedKey || "YOUR_API_KEY";

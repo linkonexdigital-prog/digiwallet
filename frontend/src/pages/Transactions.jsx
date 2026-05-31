@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api, { inr } from "@/lib/api";
 import { ArrowDownLeft, ArrowUpRight, MagnifyingGlass, FunnelSimple } from "@phosphor-icons/react";
 
@@ -9,16 +9,15 @@ export default function Transactions() {
   const [statusF, setStatusF] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const r = await api.get("/transactions", { params: { q: q || undefined, type: type || undefined, status: statusF || undefined, limit: 100 } });
       setItems(r.data.items);
     } finally { setLoading(false); }
-  };
+  }, [q, type, statusF]);
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { const id = setTimeout(load, 350); return () => clearTimeout(id); }, [q, type, statusF]);
+  useEffect(() => { const id = setTimeout(load, 350); return () => clearTimeout(id); }, [load]);
 
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto fade-up">

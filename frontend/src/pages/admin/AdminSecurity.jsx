@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api, { fmtErr } from "@/lib/api";
 import { ShieldCheck, SignOut, Warning } from "@phosphor-icons/react";
 
@@ -8,12 +8,14 @@ export default function AdminSecurity() {
   const [filter, setFilter] = useState("");
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
-  const load = async () => {
-    const params = filter === "success" ? { success: true } : filter === "failed" ? { success: false } : {};
+  const load = useCallback(async () => {
+    let params = {};
+    if (filter === "success") params = { success: true };
+    else if (filter === "failed") params = { success: false };
     const [a, b] = await Promise.all([api.get("/admin/security/login-logs", { params }), api.get("/admin/security/sessions")]);
     setLogins(a.data); setSessions(b.data);
-  };
-  useEffect(() => { load(); }, [filter]);
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
 
   const forceAll = async () => {
     if (!window.confirm("Force logout ALL non-admin users? They will need to sign in again.")) return;

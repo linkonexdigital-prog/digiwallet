@@ -109,3 +109,35 @@ See `/app/memory/test_credentials.md`.
 - `GET /api/admin/transactions/{id}` — detail + user + api_log + related_withdrawal + admin
 - `GET /api/admin/transactions/export` — CSV export
 - `PATCH /api/admin/transactions/{id}` — update description, status, flagged, admin_note
+
+
+---
+
+## v2.3 Code-Quality Pass (Feb 2026)
+
+### Applied fixes
+- **Hooks deps** — wrapped every async `load`/`loadUsers`/`refreshPush`/`showNotification`/`playPing` in `useCallback`; updated all `useEffect` arrays. Files: `Dashboard.jsx`, `Transactions.jsx`, `Settings.jsx`, `useLiveNotifications.js`, `AdminUsers.jsx`, `AdminWithdrawals.jsx`, `AdminWallet.jsx`, `AdminApi.jsx` (+ `GatewayUrlPanel` selectedKey dep), `AdminSecurity.jsx`, `AdminTransactions.jsx`. Eliminates stale-closure risk in pollers and push handlers.
+- **Empty catch blocks** — `Dashboard.jsx` & `useLiveNotifications.js#playPing` now log via `console.debug` in dev only.
+- **Context perf** — `AuthContext` and `ThemeContext` value objects wrapped in `useMemo` to stop unnecessary downstream re-renders.
+- **Nested ternaries** extracted to named helpers (`tintBgClass`, `tintIconClass`, `typeIconWrap`, `typeIcon`, `pillType`, `amountColor`, `renderPushBadge`) in `Dashboard.jsx`, `AdminTransactions.jsx`, `Settings.jsx`.
+- **Hardcoded test creds** — `tests/backend_test.py` now reads `DW_TEST_ADMIN_MOBILE`/`DW_TEST_ADMIN_PASSWORD` env vars (defaults retained for CI compatibility).
+
+### Deliberately NOT applied (with rationale)
+- `is` vs `==` for constants — **all** flagged sites are `is None` (PEP 8 mandated idiom). The linter rule is misfiring; no change needed.
+- `amt` undefined at `server.py:1048` — false positive: `amt` is bound on line 971 inside a try; the except branch returns. All control paths to line 1048 have `amt` defined.
+- `localStorage` → httpOnly cookies — architectural rewrite (would require backend cookie middleware, CORS `credentials: include`, CSRF token plumbing, and changes to every protected API call). JWT-in-localStorage is industry-standard for SPAs and not blocking. Tracked as future task.
+- Splitting `_handle_gateway_credit`, `admin_transactions`, `useLiveNotifications`, `Settings`, `AppLayout` into sub-units — pure refactors. Tracked in roadmap below.
+
+### Verification
+- `webpack compiled successfully` with **zero** warnings.
+- `eslint` clean.
+- `/api/auth/login` returns valid JWT (curl).
+- `/login` page renders, route guard redirects `/app` → `/login` when token invalid.
+- No JS console errors.
+
+### Roadmap (still pending)
+- P1: Split `server.py` (1554 lines) into routers `auth.py`, `transactions.py`, `admin.py`, `webhooks.py`.
+- P1: Pagination for `/api/admin/transactions` and `/api/transactions` (currently bounded at 100/200 limit only).
+- P1: Decompose `useLiveNotifications` into `useServiceWorker`, `useNotificationPoller`; split `Settings.jsx` into 3 sub-cards.
+- P2: Stream-based CSV export for large datasets.
+- P2: Consider httpOnly cookie auth migration if compliance requires.

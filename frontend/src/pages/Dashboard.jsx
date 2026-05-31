@@ -1,15 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { ArrowUpRight, ArrowDownLeft, Clock, Lightning, Wallet, EyeSlash, Eye, Sparkle } from "@phosphor-icons/react";
 
+const tintBgClass = (tint) => {
+  if (tint === "success") return "bg-success/20";
+  if (tint === "danger") return "bg-destructive/15";
+  if (tint === "brand") return "bg-brand/20";
+  return "bg-warning/15";
+};
+
+const tintIconClass = (tint) => {
+  if (tint === "success") return "text-success";
+  if (tint === "danger") return "text-destructive";
+  if (tint === "brand") return "text-brand";
+  return "text-muted-foreground";
+};
+
 const StatCard = ({ label, value, sub, accent, testId, icon: Icon, tint }) => (
   <div data-testid={testId} className="card-flat p-5 hover-lift relative overflow-hidden group">
-    {tint && <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-60 transition-opacity group-hover:opacity-100 ${tint === "success" ? "bg-success/20" : tint === "danger" ? "bg-destructive/15" : tint === "brand" ? "bg-brand/20" : "bg-warning/15"}`}/>}
+    {tint && <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-60 transition-opacity group-hover:opacity-100 ${tintBgClass(tint)}`}/>}
     <div className="flex items-start justify-between mb-3 relative">
       <div className="overline text-muted-foreground">{label}</div>
-      {Icon && <Icon size={16} className={tint === "success" ? "text-success" : tint === "danger" ? "text-destructive" : tint === "brand" ? "text-brand" : "text-muted-foreground"} weight="duotone"/>}
+      {Icon && <Icon size={16} className={tintIconClass(tint)} weight="duotone"/>}
     </div>
     <div className={`mono text-3xl md:text-4xl font-bold tracking-tight relative ${accent || ""}`}>{value}</div>
     {sub && <div className="text-xs text-muted-foreground mt-2 relative">{sub}</div>}
@@ -31,16 +45,18 @@ export default function Dashboard() {
   const [tx, setTx] = useState([]);
   const [show, setShow] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [a, b] = await Promise.all([
         api.get("/wallet/summary"),
         api.get("/transactions", { params: { limit: 6 } }),
       ]);
       setS(a.data); setTx(b.data.items);
-    } catch (e) {}
-  };
-  useEffect(() => { load(); const i = setInterval(load, 8000); return () => clearInterval(i); }, []);
+    } catch (e) {
+      if (process.env.NODE_ENV !== "production") console.debug("[dw] dashboard load", e);
+    }
+  }, []);
+  useEffect(() => { load(); const i = setInterval(load, 8000); return () => clearInterval(i); }, [load]);
 
   const firstName = (user?.full_name || "").split(" ")[0] || "there";
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
