@@ -27,7 +27,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
-      <div className="hidden lg:flex relative bg-foreground text-background p-12 flex-col justify-between overflow-hidden">
+      <div className="hidden lg:flex relative bg-brand text-brand-foreground p-12 flex-col justify-between overflow-hidden">
         <div className="absolute inset-0 opacity-20 grid-bg" />
         <Link to="/" className="flex items-center gap-2 z-10">
           <div className="w-9 h-9 rounded-md bg-background text-foreground flex items-center justify-center">
@@ -52,7 +52,7 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-10">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-md bg-foreground text-background flex items-center justify-center">
+              <div className="w-9 h-9 rounded-md bg-brand text-brand-foreground flex items-center justify-center">
                 <Wallet size={20} weight="duotone"/>
               </div>
               <span className="font-display font-bold text-lg">DigiWallet.v2</span>
@@ -100,7 +100,7 @@ export default function Login() {
               data-testid="login-submit-button"
               disabled={busy}
               type="submit"
-              className="w-full px-6 py-3 bg-foreground text-background rounded-md font-semibold hover-lift disabled:opacity-50 inline-flex items-center justify-center gap-2"
+              className="w-full px-6 py-3 bg-brand text-brand-foreground rounded-md font-semibold hover-lift disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
               {busy ? "Signing in…" : <>Sign in <ArrowRight size={16} weight="bold"/></>}
             </button>

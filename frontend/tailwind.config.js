@@ -51,6 +51,11 @@ module.exports = {
                 success: 'hsl(var(--success))',
                 warning: 'hsl(var(--warning))',
                 surface: 'hsl(var(--surface))',
+                brand: {
+                    DEFAULT: 'hsl(var(--brand))',
+                    foreground: 'hsl(var(--brand-fg))',
+                    glow: 'hsl(var(--brand-glow))',
+                },
                 border: 'hsl(var(--border))',
                 input: 'hsl(var(--input))',
                 ring: 'hsl(var(--ring))',

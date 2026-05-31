@@ -61,7 +61,7 @@ export default function AdminWithdrawals() {
         <div className="flex gap-1 flex-wrap">
           {STATUSES.map((s) => (
             <button key={s || "all"} data-testid={`wd-status-${s || "all"}`} onClick={() => setStatus(s)}
-              className={`px-3 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition ${status === s ? "bg-foreground text-background" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
+              className={`px-3 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition ${status === s ? "bg-brand text-brand-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
               {s || "all"}
             </button>
           ))}
@@ -75,7 +75,7 @@ export default function AdminWithdrawals() {
         <div className="card-flat p-3 flex flex-wrap gap-2 items-center mb-3">
           <span className="text-sm font-semibold mr-3">{selected.length} selected</span>
           <button onClick={() => bulk("approve")} className="px-3 py-2 text-sm font-semibold rounded-md bg-success/10 text-success">Approve</button>
-          <button onClick={() => bulk("paid")} className="px-3 py-2 text-sm font-semibold rounded-md bg-foreground text-background">Mark paid</button>
+          <button onClick={() => bulk("paid")} className="px-3 py-2 text-sm font-semibold rounded-md bg-brand text-brand-foreground">Mark paid</button>
           <button onClick={() => bulk("reject")} className="px-3 py-2 text-sm font-semibold rounded-md bg-destructive/10 text-destructive">Reject</button>
         </div>
       )}
@@ -107,7 +107,7 @@ export default function AdminWithdrawals() {
                   <td>
                     <div className="flex gap-1">
                       {w.status === "pending" && <button data-testid={`wd-approve-${w.id}`} onClick={() => action(w.id, "approve")} className="p-1.5 rounded-md bg-success/10 text-success hover:bg-success/20" title="Approve"><Check size={14}/></button>}
-                      {(w.status === "pending" || w.status === "approved") && <button data-testid={`wd-paid-${w.id}`} onClick={() => action(w.id, "paid")} className="p-1.5 rounded-md bg-foreground text-background hover:opacity-90" title="Mark paid"><Money size={14}/></button>}
+                      {(w.status === "pending" || w.status === "approved") && <button data-testid={`wd-paid-${w.id}`} onClick={() => action(w.id, "paid")} className="p-1.5 rounded-md bg-brand text-brand-foreground hover:opacity-90" title="Mark paid"><Money size={14}/></button>}
                       {(w.status === "pending" || w.status === "approved") && <button data-testid={`wd-reject-${w.id}`} onClick={() => action(w.id, "reject")} className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20" title="Reject"><XIcon size={14}/></button>}
                     </div>
                   </td>

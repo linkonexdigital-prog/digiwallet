@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useTheme } from "@/lib/ThemeContext";
 import { useLiveNotifications } from "@/lib/useLiveNotifications";
+import { ensureSWRegistered, subscribeForPush, getPushStatus } from "@/lib/webPush";
 import {
   Wallet, House, ArrowsLeftRight, Bank, Bell, Gear, SignOut,
   Sun, Moon, List, X, ArrowUUpLeft, User as UserIcon, BellRinging
@@ -24,12 +25,20 @@ export default function AppLayout({ children }) {
   const { unread, permission, requestPermission } = useLiveNotifications(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem("dw_notif_banner_dismissed") === "1");
+  const [pushSubscribed, setPushSubscribed] = useState(false);
   const adminBackup = typeof window !== "undefined" && localStorage.getItem("dw_admin_backup");
+
+  // Register SW + check push status on mount
+  useEffect(() => {
+    ensureSWRegistered();
+    getPushStatus().then((s) => setPushSubscribed(s.subscribed));
+  }, []);
 
   const dismissBanner = () => { localStorage.setItem("dw_notif_banner_dismissed", "1"); setBannerDismissed(true); };
   const enablePush = async () => {
-    const p = await requestPermission();
-    if (p === "granted") dismissBanner();
+    const r = await subscribeForPush();
+    if (r.ok) { setPushSubscribed(true); dismissBanner(); }
+    else if (r.reason === "denied") { dismissBanner(); }
   };
 
   return (
@@ -37,7 +46,7 @@ export default function AppLayout({ children }) {
       {/* Top bar (mobile) */}
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background px-4 py-3">
         <Link to="/app" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-md bg-foreground text-background flex items-center justify-center"><Wallet size={18} weight="duotone"/></div>
+          <div className="w-8 h-8 rounded-md bg-brand text-brand-foreground flex items-center justify-center"><Wallet size={18} weight="duotone"/></div>
           <span className="font-display font-bold">DigiWallet</span>
         </Link>
         <div className="flex items-center gap-2">
@@ -55,7 +64,7 @@ export default function AppLayout({ children }) {
         <aside className="hidden lg:flex w-64 shrink-0 h-screen sticky top-0 border-r border-border flex-col bg-card">
           <div className="px-5 py-5 border-b border-border">
             <Link to="/app" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-md bg-foreground text-background flex items-center justify-center"><Wallet size={20} weight="duotone"/></div>
+              <div className="w-9 h-9 rounded-md bg-brand text-brand-foreground flex items-center justify-center"><Wallet size={20} weight="duotone"/></div>
               <div>
                 <div className="font-display font-bold text-base leading-none">DigiWallet</div>
                 <div className="overline text-muted-foreground mt-1">v2 · User Portal</div>
@@ -71,7 +80,7 @@ export default function AppLayout({ children }) {
                 data-testid={`sidebar-${it.label.toLowerCase()}-link`}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition ${
-                    isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    isActive ? "bg-brand text-brand-foreground shadow-lg shadow-brand/20" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   }`
                 }
               >
@@ -116,7 +125,7 @@ export default function AppLayout({ children }) {
             <div className="absolute top-0 left-0 w-72 h-full bg-card border-r border-border p-4 fade-up" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <Link to="/app" className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-md bg-foreground text-background flex items-center justify-center"><Wallet size={18}/></div>
+                  <div className="w-8 h-8 rounded-md bg-brand text-brand-foreground flex items-center justify-center"><Wallet size={18}/></div>
                   <span className="font-display font-bold">DigiWallet</span>
                 </Link>
                 <button onClick={() => setMobileOpen(false)} className="p-2 rounded-md hover:bg-secondary"><X size={18}/></button>
@@ -126,7 +135,7 @@ export default function AppLayout({ children }) {
                   <NavLink key={it.to} to={it.to} end={it.end} onClick={() => setMobileOpen(false)}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium ${
-                        isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary"
+                        isActive ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-secondary"
                       }`
                     }>
                     <it.icon size={18} weight="duotone"/>
@@ -142,17 +151,17 @@ export default function AppLayout({ children }) {
         )}
 
         <main className="flex-1 min-w-0">
-          {permission === "default" && !bannerDismissed && (
+          {permission === "default" && !pushSubscribed && !bannerDismissed && (
             <div className="px-4 lg:px-6 pt-4">
-              <div className="card-flat px-4 py-3 flex items-center gap-3 bg-gradient-to-r from-success/10 to-transparent border-success/30">
-                <div className="w-10 h-10 rounded-md bg-success/15 text-success flex items-center justify-center shrink-0">
+              <div className="card-flat px-4 py-3 flex items-center gap-3 bg-gradient-to-r from-brand/10 to-transparent border-brand/30">
+                <div className="w-10 h-10 rounded-md bg-brand/15 text-brand flex items-center justify-center shrink-0">
                   <BellRinging size={20} weight="duotone"/>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">Enable live alerts</div>
-                  <div className="text-xs text-muted-foreground">Get instant browser notifications for credits, withdrawals and approvals — even when this tab is in background.</div>
+                  <div className="text-sm font-semibold">Enable real-time push alerts</div>
+                  <div className="text-xs text-muted-foreground">Get instant Chrome / phone notifications for credits & withdrawals — <strong>even when DigiWallet is closed</strong>.</div>
                 </div>
-                <button data-testid="enable-push-btn" onClick={enablePush} className="px-3 py-2 rounded-md bg-foreground text-background text-xs font-bold shrink-0 hover-lift">Enable</button>
+                <button data-testid="enable-push-btn" onClick={enablePush} className="px-3 py-2 rounded-md bg-brand text-brand-foreground text-xs font-bold shrink-0 hover-lift">Enable</button>
                 <button onClick={dismissBanner} className="p-2 text-muted-foreground hover:text-foreground"><X size={16}/></button>
               </div>
             </div>

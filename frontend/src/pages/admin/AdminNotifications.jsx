@@ -35,11 +35,11 @@ export default function AdminNotifications() {
         <div className="flex gap-2">
           <label className="flex-1 cursor-pointer">
             <input type="radio" className="sr-only peer" checked={form.target === "all"} onChange={() => setForm({ ...form, target: "all" })}/>
-            <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-foreground peer-checked:text-background">All users</div>
+            <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-brand peer-checked:text-brand-foreground">All users</div>
           </label>
           <label className="flex-1 cursor-pointer">
             <input type="radio" className="sr-only peer" checked={form.target === "selected"} onChange={() => setForm({ ...form, target: "selected" })}/>
-            <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-foreground peer-checked:text-background">Selected</div>
+            <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-brand peer-checked:text-brand-foreground">Selected</div>
           </label>
         </div>
 
@@ -53,7 +53,7 @@ export default function AdminNotifications() {
         {msg && <div className="text-sm bg-success/10 text-success border border-success/30 px-3 py-2 rounded-md">{msg}</div>}
         {err && <div className="text-sm bg-destructive/10 text-destructive border border-destructive/30 px-3 py-2 rounded-md">{err}</div>}
 
-        <button data-testid="broadcast-send-btn" type="submit" className="w-full px-4 py-3 rounded-md bg-foreground text-background font-semibold inline-flex items-center justify-center gap-2">
+        <button data-testid="broadcast-send-btn" type="submit" className="w-full px-4 py-3 rounded-md bg-brand text-brand-foreground font-semibold inline-flex items-center justify-center gap-2">
           <PaperPlaneTilt size={16}/> Send broadcast
         </button>
       </form>

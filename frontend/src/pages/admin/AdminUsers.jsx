@@ -158,7 +158,7 @@ export default function AdminUsers() {
                   Freeze wallet
                 </label>
                 <textarea value={edit.internal_notes || ""} onChange={(e) => setEdit({ ...edit, internal_notes: e.target.value })} placeholder="Internal notes" rows={3} className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm"/>
-                <button data-testid="admin-user-save-btn" onClick={saveEdit} className="px-4 py-2 rounded-md bg-foreground text-background text-sm font-semibold inline-flex items-center gap-2"><FloppyDisk size={14}/> Save changes</button>
+                <button data-testid="admin-user-save-btn" onClick={saveEdit} className="px-4 py-2 rounded-md bg-brand text-brand-foreground text-sm font-semibold inline-flex items-center gap-2"><FloppyDisk size={14}/> Save changes</button>
               </div>
 
               <div className="card-flat p-4">
@@ -179,7 +179,7 @@ export default function AdminUsers() {
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={resetPw} className="px-3 py-2 rounded-md bg-secondary text-sm font-semibold inline-flex items-center gap-2"><KeyReturn size={14}/> Reset password</button>
                   <button onClick={forceLogout} className="px-3 py-2 rounded-md bg-secondary text-sm font-semibold">Force logout</button>
-                  <button data-testid="admin-login-as-btn" onClick={loginAsUser} className="col-span-2 px-3 py-2 rounded-md bg-foreground text-background text-sm font-semibold inline-flex items-center justify-center gap-2"><SignIn size={14}/> Login as user</button>
+                  <button data-testid="admin-login-as-btn" onClick={loginAsUser} className="col-span-2 px-3 py-2 rounded-md bg-brand text-brand-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"><SignIn size={14}/> Login as user</button>
                 </div>
               </div>
 

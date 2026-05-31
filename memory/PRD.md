@@ -63,3 +63,25 @@ Rebuild a premium fintech-style digital wallet platform ("DigiWallet V2") with m
 See `/app/memory/test_credentials.md`.
 - Admin: mobile `9999999999`, password `Admin@123`
 - Test user (created during testing): mobile `8888888888`, password `Test@123`
+
+---
+
+## v2.1 Update (Jan 2026)
+
+### Added
+- **Web Push (real OS-level notifications)** via Service Worker (`/sw.js`) + VAPID keys auto-generated on first startup. Users get notifications on Chrome/phone even when DigiWallet tab is closed.
+- **Per-user Telegram bot alerts** — each user can save their own Telegram chat ID in Settings and receive transaction alerts on their personal Telegram.
+- **`digiwallet<12-digit>` reference IDs** — every transaction gets a unique `ref_id` like `digiwallet622412553573` (shown in Transactions page, hidden from dashboard recent list which shows timestamp instead).
+- **3 admin-controlled color themes** — Monochrome / Emerald / Cobalt — applied site-wide for BOTH user and admin dashboards. Live preview as admin selects.
+- **7-day trend chart** on admin dashboard (Recharts area chart with brand gradient).
+- **Brand-color system** — all primary CTAs, sidebar active states, hero gradients, pulsing dots now use `--brand` CSS variable that switches with theme.
+
+### API additions
+- `GET /api/push/public-key` — VAPID public key for subscription
+- `POST /api/push/subscribe` — store subscription (auth required)
+- `POST /api/push/unsubscribe` — remove subscription
+- `POST /api/push/test` — fire a test push to current user
+- `POST /api/auth/telegram` — save user's Telegram chat ID
+- `POST /api/auth/telegram/test` — send test message to user's chat
+- `PATCH /api/admin/settings { color_theme: monochrome|emerald|cobalt }` — site-wide theme switch
+- `GET /api/admin/dashboard` now includes `chart_7d` (array of 7 daily totals)

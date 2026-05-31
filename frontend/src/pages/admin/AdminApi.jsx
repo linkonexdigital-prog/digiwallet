@@ -34,7 +34,7 @@ export default function AdminApi() {
           <div className="overline text-muted-foreground mb-2">Integrations</div>
           <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight">API Keys</h1>
         </div>
-        <button data-testid="apikey-create-toggle" onClick={() => setShowForm(!showForm)} className="px-4 py-2.5 rounded-md bg-foreground text-background text-sm font-semibold inline-flex items-center gap-2 hover-lift"><Plus size={14} weight="bold"/> Create key</button>
+        <button data-testid="apikey-create-toggle" onClick={() => setShowForm(!showForm)} className="px-4 py-2.5 rounded-md bg-brand text-brand-foreground text-sm font-semibold inline-flex items-center gap-2 hover-lift"><Plus size={14} weight="bold"/> Create key</button>
       </div>
 
       <GatewayUrlPanel keys={keys} />
@@ -45,7 +45,7 @@ export default function AdminApi() {
       {showForm && (
         <form onSubmit={create} className="card-flat p-4 mb-4 flex gap-2">
           <input data-testid="apikey-name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Key name (e.g. Production Backend)" className="flex-1 px-3 py-2.5 bg-surface border border-border rounded-md text-sm" required/>
-          <button data-testid="apikey-create-submit" type="submit" className="px-4 py-2.5 rounded-md bg-foreground text-background text-sm font-semibold">Generate</button>
+          <button data-testid="apikey-create-submit" type="submit" className="px-4 py-2.5 rounded-md bg-brand text-brand-foreground text-sm font-semibold">Generate</button>
         </form>
       )}
 
@@ -150,7 +150,7 @@ function GatewayUrlPanel({ keys }) {
       <div className="border border-border rounded-md overflow-hidden mb-4">
         <div className="px-4 py-2.5 bg-surface flex justify-between items-center gap-3">
           <div className="text-sm font-semibold">Gateway URL Template</div>
-          <button onClick={copy} data-testid="gw-copy-url" className="px-3 py-1.5 rounded-md bg-foreground text-background text-xs font-semibold inline-flex items-center gap-1.5 shrink-0">
+          <button onClick={copy} data-testid="gw-copy-url" className="px-3 py-1.5 rounded-md bg-brand text-brand-foreground text-xs font-semibold inline-flex items-center gap-1.5 shrink-0">
             {copied ? <><Check size={12}/> Copied</> : <><Copy size={12}/> Copy</>}
           </button>
         </div>

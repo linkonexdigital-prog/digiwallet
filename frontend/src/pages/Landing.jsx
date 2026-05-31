@@ -10,14 +10,14 @@ export default function Landing() {
       {/* Nav */}
       <nav className="relative z-10 px-6 lg:px-12 py-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-md bg-foreground text-background flex items-center justify-center">
+          <div className="w-9 h-9 rounded-md bg-brand text-brand-foreground flex items-center justify-center">
             <Wallet size={20} weight="duotone" />
           </div>
           <span className="font-display text-lg font-bold tracking-tight">DigiWallet<span className="text-muted-foreground">.v2</span></span>
         </div>
         <div className="flex items-center gap-3">
           <Link to="/login" data-testid="nav-login-link" className="px-4 py-2 text-sm font-semibold hover:bg-secondary rounded-md transition">Sign in</Link>
-          <Link to="/register" data-testid="nav-register-link" className="px-4 py-2 text-sm font-semibold bg-foreground text-background rounded-md hover-lift inline-flex items-center gap-2">
+          <Link to="/register" data-testid="nav-register-link" className="px-4 py-2 text-sm font-semibold bg-brand text-brand-foreground rounded-md hover-lift inline-flex items-center gap-2">
             Get started <ArrowRight size={14} weight="bold" />
           </Link>
         </div>
@@ -37,7 +37,7 @@ export default function Landing() {
               Built for users who expect speed, security, and absolute clarity over their funds.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
-              <Link to="/register" data-testid="hero-cta-register" className="px-6 py-3 rounded-md bg-foreground text-background text-sm font-semibold hover-lift inline-flex items-center gap-2">
+              <Link to="/register" data-testid="hero-cta-register" className="px-6 py-3 rounded-md bg-brand text-brand-foreground text-sm font-semibold hover-lift inline-flex items-center gap-2">
                 Open your wallet <ArrowRight size={16} weight="bold"/>
               </Link>
               <Link to="/login" data-testid="hero-cta-login" className="px-6 py-3 rounded-md border border-border text-sm font-semibold hover:bg-secondary transition">
@@ -67,7 +67,7 @@ export default function Landing() {
                   <div className="overline text-muted-foreground">Available Balance</div>
                   <div className="mono text-4xl font-bold mt-2">₹ 84,250<span className="text-xl text-muted-foreground">.00</span></div>
                 </div>
-                <div className="w-10 h-10 rounded-md bg-foreground text-background flex items-center justify-center">
+                <div className="w-10 h-10 rounded-md bg-brand text-brand-foreground flex items-center justify-center">
                   <Wallet size={20} weight="duotone"/>
                 </div>
               </div>

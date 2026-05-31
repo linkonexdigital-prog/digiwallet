@@ -66,7 +66,7 @@ export default function Withdrawals() {
           <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight">Withdrawals</h1>
           <p className="text-sm text-muted-foreground mt-2">Available balance: <span className="mono font-bold text-foreground">₹ {inr(balance)}</span></p>
         </div>
-        <button data-testid="withdraw-open-btn" onClick={() => setShowWithdraw(true)} className="px-4 py-2.5 rounded-md bg-foreground text-background text-sm font-semibold inline-flex items-center gap-2 hover-lift">
+        <button data-testid="withdraw-open-btn" onClick={() => setShowWithdraw(true)} className="px-4 py-2.5 rounded-md bg-brand text-brand-foreground text-sm font-semibold inline-flex items-center gap-2 hover-lift">
           <ArrowUpRight size={16} weight="bold"/> New withdrawal
         </button>
       </div>
@@ -91,11 +91,11 @@ export default function Withdrawals() {
               <div className="flex gap-2">
                 <label className="flex-1 cursor-pointer">
                   <input type="radio" className="sr-only peer" checked={pmForm.type === "upi"} onChange={() => setPmForm({ ...pmForm, type: "upi" })}/>
-                  <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-foreground peer-checked:text-background transition">UPI</div>
+                  <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-brand peer-checked:text-brand-foreground transition">UPI</div>
                 </label>
                 <label className="flex-1 cursor-pointer">
                   <input type="radio" className="sr-only peer" checked={pmForm.type === "bank"} onChange={() => setPmForm({ ...pmForm, type: "bank" })}/>
-                  <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-foreground peer-checked:text-background transition">Bank</div>
+                  <div className="border border-border rounded-md p-3 text-center text-sm font-semibold peer-checked:bg-brand peer-checked:text-brand-foreground transition">Bank</div>
                 </label>
               </div>
               {pmForm.type === "upi" ? (
@@ -109,7 +109,7 @@ export default function Withdrawals() {
                   <input value={pmForm.bank_name} onChange={(e) => setPmForm({ ...pmForm, bank_name: e.target.value })} placeholder="Bank name" className="col-span-2 px-3 py-2.5 bg-background border border-border rounded-md text-sm"/>
                 </div>
               )}
-              <button data-testid="pm-save-btn" type="submit" className="w-full px-4 py-2.5 rounded-md bg-foreground text-background text-sm font-semibold">Save method</button>
+              <button data-testid="pm-save-btn" type="submit" className="w-full px-4 py-2.5 rounded-md bg-brand text-brand-foreground text-sm font-semibold">Save method</button>
             </form>
           )}
 
@@ -162,7 +162,7 @@ export default function Withdrawals() {
                   ))}
                 </select>
               </div>
-              <button data-testid="withdraw-submit-btn" type="submit" className="w-full px-4 py-3 rounded-md bg-foreground text-background font-semibold hover-lift">
+              <button data-testid="withdraw-submit-btn" type="submit" className="w-full px-4 py-3 rounded-md bg-brand text-brand-foreground font-semibold hover-lift">
                 Submit withdrawal
               </button>
             </form>

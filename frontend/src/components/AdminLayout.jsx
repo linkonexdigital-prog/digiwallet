@@ -36,7 +36,7 @@ export default function AdminLayout({ children }) {
     <div className="min-h-screen bg-background text-foreground">
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background px-4 py-3">
         <Link to="/admin" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-md bg-foreground text-background flex items-center justify-center"><Wallet size={18} weight="duotone"/></div>
+          <div className="w-8 h-8 rounded-md bg-brand text-brand-foreground flex items-center justify-center"><Wallet size={18} weight="duotone"/></div>
           <span className="font-display font-bold">Admin</span>
         </Link>
         <div className="flex gap-2">
@@ -49,7 +49,7 @@ export default function AdminLayout({ children }) {
         <aside className="hidden lg:flex w-64 shrink-0 h-screen sticky top-0 border-r border-border flex-col bg-card">
           <div className="px-5 py-5 border-b border-border">
             <Link to="/admin" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-md bg-foreground text-background flex items-center justify-center"><Wallet size={20} weight="duotone"/></div>
+              <div className="w-9 h-9 rounded-md bg-brand text-brand-foreground flex items-center justify-center"><Wallet size={20} weight="duotone"/></div>
               <div>
                 <div className="font-display font-bold text-base leading-none">DigiWallet</div>
                 <div className="overline text-muted-foreground mt-1">Super Admin</div>
@@ -67,7 +67,7 @@ export default function AdminLayout({ children }) {
                       data-testid={`admin-nav-${it.label.toLowerCase().replace(/\s+/g, "-")}`}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition ${
-                          isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          isActive ? "bg-brand text-brand-foreground shadow-lg shadow-brand/20" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                         }`
                       }>
                       <it.icon size={18} weight="duotone"/> {it.label}
@@ -83,7 +83,7 @@ export default function AdminLayout({ children }) {
               {theme === "dark" ? <Sun size={18}/> : <Moon size={18}/>} {theme === "dark" ? "Light mode" : "Dark mode"}
             </button>
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-9 h-9 rounded-full bg-foreground text-background flex items-center justify-center"><UserIcon size={16}/></div>
+              <div className="w-9 h-9 rounded-full bg-brand text-brand-foreground flex items-center justify-center"><UserIcon size={16}/></div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate">{user?.full_name}</div>
                 <div className="overline text-muted-foreground">Admin</div>
@@ -109,7 +109,7 @@ export default function AdminLayout({ children }) {
                     <NavLink key={it.to} to={it.to} end={it.end} onClick={() => setOpenMobile(false)}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium ${
-                          isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary"
+                          isActive ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-secondary"
                         }`
                       }>
                       <it.icon size={18} weight="duotone"/> {it.label}

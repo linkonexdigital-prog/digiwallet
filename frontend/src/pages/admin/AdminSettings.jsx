@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import api, { fmtErr } from "@/lib/api";
-import { FloppyDisk, TelegramLogo, Globe, PaperPlaneTilt } from "@phosphor-icons/react";
+import { useTheme } from "@/lib/ThemeContext";
+import { FloppyDisk, TelegramLogo, Globe, PaperPlaneTilt, Palette } from "@phosphor-icons/react";
 
 export default function AdminSettings() {
   const [s, setS] = useState({});
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+  const { setColorTheme } = useTheme();
 
   const load = async () => {
     const r = await api.get("/admin/settings"); setS(r.data || {});
@@ -13,7 +15,11 @@ export default function AdminSettings() {
 
   const save = async (e) => {
     e?.preventDefault();
-    try { await api.patch("/admin/settings", s); setMsg("Settings saved."); }
+    try {
+      await api.patch("/admin/settings", s);
+      if (s.color_theme) setColorTheme(s.color_theme);
+      setMsg("Settings saved.");
+    }
     catch (e) { setErr(fmtErr(e)); }
   };
 
@@ -22,7 +28,11 @@ export default function AdminSettings() {
     catch (e) { setErr(fmtErr(e)); }
   };
 
-  const set = (k, v) => setS({ ...s, [k]: v });
+  const set = (k, v) => {
+    setS({ ...s, [k]: v });
+    // Live preview for color theme
+    if (k === "color_theme") setColorTheme(v);
+  };
 
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto fade-up">
@@ -42,6 +52,37 @@ export default function AdminSettings() {
           <Field label="Favicon URL" v={s.favicon_url} on={(v) => set("favicon_url", v)}/>
           <Field label="SEO title" v={s.seo_title} on={(v) => set("seo_title", v)}/>
           <Field label="SEO description" v={s.seo_description} on={(v) => set("seo_description", v)} multiline/>
+        </div>
+
+        <div className="card-flat p-6">
+          <div className="flex items-center gap-2 mb-3"><Palette size={18}/><h3 className="font-display text-lg font-bold">Color theme</h3></div>
+          <p className="text-xs text-muted-foreground mb-4">Selected theme applies <strong>site-wide</strong> for both user and admin dashboards.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { id: "monochrome", name: "Monochrome", desc: "Classic black & white", swatches: ["#0a0a0a", "#ffffff", "#737373"] },
+              { id: "emerald", name: "Emerald", desc: "Premium fintech green", swatches: ["#10b981", "#064e3b", "#a7f3d0"] },
+              { id: "cobalt", name: "Cobalt", desc: "Deep blue authority", swatches: ["#3b82f6", "#1e3a8a", "#bfdbfe"] },
+            ].map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                data-testid={`color-theme-${t.id}`}
+                onClick={() => set("color_theme", t.id)}
+                className={`text-left p-4 rounded-md border-2 transition relative ${(s.color_theme || "monochrome") === t.id ? "border-foreground bg-surface" : "border-border hover:border-foreground/40"}`}
+              >
+                <div className="flex gap-1.5 mb-3">
+                  {t.swatches.map((c, i) => (
+                    <span key={i} style={{ background: c }} className="w-7 h-7 rounded-full border border-border"/>
+                  ))}
+                </div>
+                <div className="font-semibold text-sm">{t.name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{t.desc}</div>
+                {(s.color_theme || "monochrome") === t.id && (
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-success"/>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="card-flat p-6 space-y-3">
@@ -73,7 +114,7 @@ export default function AdminSettings() {
           </label>
         </div>
 
-        <button data-testid="settings-save-btn" type="submit" className="px-5 py-3 rounded-md bg-foreground text-background font-semibold inline-flex items-center gap-2"><FloppyDisk size={16}/> Save all changes</button>
+        <button data-testid="settings-save-btn" type="submit" className="px-5 py-3 rounded-md bg-brand text-brand-foreground font-semibold inline-flex items-center gap-2"><FloppyDisk size={16}/> Save all changes</button>
       </form>
     </div>
   );

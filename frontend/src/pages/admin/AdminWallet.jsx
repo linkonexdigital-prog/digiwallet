@@ -86,7 +86,7 @@ export default function AdminWallet() {
                   { k: "adjust", l: "Adjust", i: Equals },
                 ].map((o) => (
                   <button key={o.k} data-testid={`wallet-op-${o.k}`} onClick={() => setOp(o.k)}
-                    className={`p-3 rounded-md border text-sm font-semibold flex items-center justify-center gap-2 transition ${op === o.k ? "bg-foreground text-background border-foreground" : "border-border hover:bg-secondary"}`}>
+                    className={`p-3 rounded-md border text-sm font-semibold flex items-center justify-center gap-2 transition ${op === o.k ? "bg-brand text-brand-foreground border-foreground" : "border-border hover:bg-secondary"}`}>
                     <o.i size={14}/> {o.l}
                   </button>
                 ))}
@@ -99,7 +99,7 @@ export default function AdminWallet() {
               <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" rows={2} className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm"/>
               {msg && <div className="text-sm bg-success/10 text-success border border-success/30 px-3 py-2 rounded-md">{msg}</div>}
               {err && <div className="text-sm bg-destructive/10 text-destructive border border-destructive/30 px-3 py-2 rounded-md">{err}</div>}
-              <button data-testid="wallet-submit-btn" onClick={submit} className="w-full px-4 py-3 rounded-md bg-foreground text-background font-semibold">
+              <button data-testid="wallet-submit-btn" onClick={submit} className="w-full px-4 py-3 rounded-md bg-brand text-brand-foreground font-semibold">
                 Execute {op}
               </button>
             </div>

@@ -80,6 +80,59 @@ h1, h2, h3, h4, h5, h6, .font-display {
         --input: 240 4% 16%;
         --ring: 0 0% 80%;
         --surface: 0 0% 7%;
+        --brand: 0 0% 100%;
+        --brand-fg: 0 0% 4%;
+        --brand-glow: 0 0% 100%;
+    }
+
+    /* ===== COLOR THEMES (admin-controlled, apply over light + dark) ===== */
+    /* Theme: EMERALD — premium fintech green */
+    :root.theme-emerald {
+        --success: 160 84% 39%;
+        --ring: 160 70% 45%;
+        --brand: 160 84% 39%;
+        --brand-fg: 0 0% 100%;
+        --brand-glow: 160 84% 50%;
+    }
+    .dark.theme-emerald {
+        --background: 158 30% 4%;
+        --card: 158 25% 7%;
+        --surface: 158 25% 8%;
+        --border: 158 18% 16%;
+        --input: 158 18% 16%;
+        --muted: 158 18% 12%;
+        --secondary: 158 18% 12%;
+        --accent: 158 18% 12%;
+        --primary: 160 84% 45%;
+        --primary-foreground: 0 0% 100%;
+        --ring: 160 84% 55%;
+        --brand: 160 84% 50%;
+        --brand-fg: 158 30% 4%;
+        --brand-glow: 160 84% 55%;
+    }
+
+    /* Theme: COBALT — deep blue authority */
+    :root.theme-cobalt {
+        --ring: 217 91% 60%;
+        --brand: 217 91% 50%;
+        --brand-fg: 0 0% 100%;
+        --brand-glow: 217 91% 60%;
+    }
+    .dark.theme-cobalt {
+        --background: 222 47% 5%;
+        --card: 222 40% 8%;
+        --surface: 222 40% 9%;
+        --border: 222 25% 18%;
+        --input: 222 25% 18%;
+        --muted: 222 25% 13%;
+        --secondary: 222 25% 13%;
+        --accent: 222 25% 13%;
+        --primary: 217 91% 60%;
+        --primary-foreground: 0 0% 100%;
+        --ring: 217 91% 70%;
+        --brand: 217 91% 60%;
+        --brand-fg: 222 47% 5%;
+        --brand-glow: 217 91% 65%;
     }
 }
 

@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
 import api, { inr } from "@/lib/api";
-import { UsersThree, Wallet, ArrowDownLeft, ArrowUpRight, Clock, Lightning } from "@phosphor-icons/react";
+import { UsersThree, Wallet, ArrowDownLeft, ArrowUpRight, Clock, Lightning, TrendUp } from "@phosphor-icons/react";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 
-const Stat = ({ label, value, sub, icon: Icon, accent, testId }) => (
-  <div data-testid={testId} className="card-flat p-5 hover-lift">
-    <div className="flex justify-between items-start mb-3">
+const Stat = ({ label, value, sub, icon: Icon, accent, testId, tint }) => (
+  <div data-testid={testId} className={`card-flat p-5 hover-lift relative overflow-hidden`}>
+    {tint && <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-60 ${tint === "brand" ? "bg-brand/20" : tint === "success" ? "bg-success/20" : tint === "danger" ? "bg-destructive/20" : "bg-warning/15"}`}/>}
+    <div className="flex justify-between items-start mb-3 relative">
       <div className="overline text-muted-foreground">{label}</div>
-      {Icon && <Icon size={16} className="text-muted-foreground" weight="duotone"/>}
+      {Icon && <Icon size={16} className={tint === "brand" ? "text-brand" : tint === "success" ? "text-success" : tint === "danger" ? "text-destructive" : "text-muted-foreground"} weight="duotone"/>}
     </div>
-    <div className={`mono text-3xl font-bold tracking-tight ${accent || ""}`}>{value}</div>
-    {sub && <div className="text-xs text-muted-foreground mt-2">{sub}</div>}
+    <div className={`mono text-3xl font-bold tracking-tight relative ${accent || ""}`}>{value}</div>
+    {sub && <div className="text-xs text-muted-foreground mt-2 relative">{sub}</div>}
   </div>
 );
 
@@ -21,6 +23,12 @@ export default function AdminDashboard() {
     load(); const i = setInterval(load, 12000); return () => { m = false; clearInterval(i); };
   }, []);
 
+  const chartData = (d?.chart_7d || []).map((p) => ({
+    day: new Date(p.day).toLocaleDateString(undefined, { weekday: "short" }),
+    Credits: p.credits,
+    Withdrawals: p.withdrawals,
+  }));
+
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto fade-up">
       <div className="mb-8">
@@ -29,17 +37,60 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <Stat testId="admin-stat-users" label="Total Users" value={d?.total_users ?? 0} sub={`${d?.active_users ?? 0} active`} icon={UsersThree}/>
-        <Stat testId="admin-stat-balance" label="Total Balance" value={`₹${inr(d?.total_balance)}`} icon={Wallet}/>
-        <Stat testId="admin-stat-credits" label="Total Credits" value={`₹${inr(d?.total_credits)}`} accent="text-success" icon={ArrowDownLeft}/>
-        <Stat testId="admin-stat-withdrawals" label="Total Withdrawals" value={`₹${inr(d?.total_withdrawals)}`} accent="text-destructive" icon={ArrowUpRight}/>
+        <Stat testId="admin-stat-users" label="Total Users" value={d?.total_users ?? 0} sub={`${d?.active_users ?? 0} active`} icon={UsersThree} tint="brand"/>
+        <Stat testId="admin-stat-balance" label="Wallet Float" value={`₹${inr(d?.total_balance)}`} icon={Wallet} tint="brand"/>
+        <Stat testId="admin-stat-credits" label="Total Credits" value={`₹${inr(d?.total_credits)}`} accent="text-success" icon={ArrowDownLeft} tint="success"/>
+        <Stat testId="admin-stat-withdrawals" label="Total Withdrawals" value={`₹${inr(d?.total_withdrawals)}`} accent="text-destructive" icon={ArrowUpRight} tint="danger"/>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        <Stat testId="admin-stat-pending-wd" label="Pending Withdrawals" value={d?.pending_withdrawals ?? 0} sub="Awaiting review" icon={Clock}/>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <Stat testId="admin-stat-pending-wd" label="Pending Withdrawals" value={d?.pending_withdrawals ?? 0} sub="Awaiting review" icon={Clock} tint="warning"/>
         <Stat testId="admin-stat-today" label="Today's Activity" value={d?.today_activity ?? 0} sub="Transactions" icon={Lightning}/>
         <Stat testId="admin-stat-api-today" label="API Requests Today" value={d?.api_requests_today ?? 0} sub="Hits to /api/credit" icon={Lightning}/>
-        <Stat testId="admin-stat-fees" label="Wallet Float" value={`₹${inr(d?.total_balance)}`} sub="Liability" icon={Wallet}/>
+        <Stat testId="admin-stat-trend" label="7-day Net" value={`₹${inr((d?.chart_7d || []).reduce((s, p) => s + p.credits - p.withdrawals, 0))}`} sub="Credits − withdrawals" icon={TrendUp} tint="brand"/>
+      </div>
+
+      {/* 7-day chart */}
+      <div className="card-flat p-6 mb-6 relative overflow-hidden">
+        <div className="absolute -top-32 -right-20 w-96 h-96 rounded-full bg-brand/[0.05] blur-3xl pointer-events-none"/>
+        <div className="flex justify-between items-end mb-4 relative">
+          <div>
+            <div className="overline text-muted-foreground">Trend</div>
+            <h3 className="font-display text-lg font-bold">Last 7 days</h3>
+            <p className="text-xs text-muted-foreground mt-1">Daily credits vs withdrawals (₹)</p>
+          </div>
+        </div>
+        <div className="h-72 relative">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gCredits" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--brand))" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="hsl(var(--brand))" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="gWithdrawals" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.35}/>
+                  <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))"/>
+              <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={11}/>
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v}/>
+              <Tooltip
+                contentStyle={{
+                  background: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+                formatter={(v) => `₹${Number(v).toLocaleString("en-IN")}`}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }}/>
+              <Area type="monotone" dataKey="Credits" stroke="hsl(var(--brand))" strokeWidth={2} fill="url(#gCredits)"/>
+              <Area type="monotone" dataKey="Withdrawals" stroke="hsl(var(--destructive))" strokeWidth={2} fill="url(#gWithdrawals)"/>
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">

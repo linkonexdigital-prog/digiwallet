@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import api, { fmtErr } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { Lock, User as UserIcon, TelegramLogo, PaperPlaneTilt, FloppyDisk, BellRinging, CheckCircle } from "@phosphor-icons/react";
+import { Lock, User as UserIcon, TelegramLogo, PaperPlaneTilt, FloppyDisk, BellRinging, CheckCircle, BellSlash } from "@phosphor-icons/react";
+import { subscribeForPush, unsubscribeFromPush, getPushStatus, sendTestPush } from "@/lib/webPush";
 
 export default function Settings() {
   const { user, refresh } = useAuth();
@@ -11,10 +12,14 @@ export default function Settings() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [tgBusy, setTgBusy] = useState(false);
-  const [pushPerm, setPushPerm] = useState(typeof Notification !== "undefined" ? Notification.permission : "denied");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushStatus, setPushStatus] = useState({ supported: false, permission: "default", subscribed: false });
+
+  const refreshPush = async () => setPushStatus(await getPushStatus());
 
   useEffect(() => {
     api.get("/auth/me").then((r) => setTgChat(r.data.telegram_chat_id || "")).catch(() => {});
+    refreshPush();
   }, []);
 
   const submitPw = async (e) => {
@@ -48,11 +53,27 @@ export default function Settings() {
   };
 
   const enablePush = async () => {
-    if (typeof Notification === "undefined") { setErr("Browser notifications not supported"); return; }
-    const p = await Notification.requestPermission();
-    setPushPerm(p);
-    if (p === "granted") setMsg("Browser notifications enabled!");
-    else setErr("Permission denied. Enable from browser site settings.");
+    setMsg(""); setErr(""); setPushBusy(true);
+    try {
+      const r = await subscribeForPush();
+      if (r.ok) setMsg("Browser push enabled. You'll get alerts even when this tab is closed.");
+      else if (r.reason === "unsupported") setErr("Your browser doesn't support push notifications.");
+      else if (r.reason === "denied") setErr("Permission denied. Enable from browser site settings.");
+      else setErr(`Could not subscribe: ${r.error || r.reason}`);
+    } catch (e) { setErr(fmtErr(e)); }
+    finally { refreshPush(); setPushBusy(false); }
+  };
+
+  const disablePush = async () => {
+    setPushBusy(true);
+    try { await unsubscribeFromPush(); setMsg("Browser push disabled."); }
+    finally { refreshPush(); setPushBusy(false); }
+  };
+
+  const doTestPush = async () => {
+    setMsg(""); setErr(""); setPushBusy(true);
+    try { await sendTestPush(); setMsg("Test push sent. Check your system notifications."); }
+    catch (e) { setErr(fmtErr(e)); } finally { setPushBusy(false); }
   };
 
   return (
@@ -63,9 +84,9 @@ export default function Settings() {
       </div>
 
       <div className="card-flat p-6 mb-6 relative overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-foreground/[0.04] blur-3xl"/>
+        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-brand/[0.06] blur-3xl"/>
         <div className="flex items-center gap-4 relative">
-          <div className="w-14 h-14 rounded-md bg-gradient-to-br from-foreground to-foreground/70 text-background flex items-center justify-center"><UserIcon size={26} weight="duotone"/></div>
+          <div className="w-14 h-14 rounded-md bg-gradient-to-br from-brand to-brand/70 text-brand-foreground flex items-center justify-center shadow-lg shadow-brand/20"><UserIcon size={26} weight="duotone"/></div>
           <div>
             <div className="font-display text-xl font-bold">{user?.full_name}</div>
             <div className="mono text-sm text-muted-foreground">{user?.mobile_number}</div>
@@ -80,22 +101,38 @@ export default function Settings() {
       {msg && <div className="mb-4 text-sm bg-success/10 text-success border border-success/30 px-3 py-2 rounded-md fade-up">{msg}</div>}
       {err && <div className="mb-4 text-sm bg-destructive/10 text-destructive border border-destructive/30 px-3 py-2 rounded-md fade-up">{err}</div>}
 
-      {/* Live alerts */}
-      <div className="card-flat p-6 mb-6 bg-gradient-to-br from-card to-success/[0.04]">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+      {/* Browser Push */}
+      <div className="card-flat p-6 mb-6 bg-gradient-to-br from-card to-brand/[0.05]">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-md bg-success/15 text-success flex items-center justify-center"><BellRinging size={22} weight="duotone"/></div>
+            <div className="w-11 h-11 rounded-md bg-brand/15 text-brand flex items-center justify-center"><BellRinging size={22} weight="duotone"/></div>
             <div>
-              <h3 className="font-display text-lg font-bold">Browser live alerts</h3>
-              <p className="text-xs text-muted-foreground mt-1">Get push notifications when money is credited, withdrawals are approved, and more.</p>
+              <h3 className="font-display text-lg font-bold">Browser push alerts</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md">Real-time notifications on your phone or computer — even when DigiWallet is closed in another tab or completely shut down.</p>
             </div>
           </div>
-          {pushPerm === "granted" ? (
-            <span className="pill pill-success inline-flex items-center gap-1"><CheckCircle size={12}/> Enabled</span>
+          {pushStatus.subscribed ? (
+            <span className="pill pill-success inline-flex items-center gap-1"><CheckCircle size={12}/> Active</span>
+          ) : pushStatus.permission === "denied" ? (
+            <span className="pill pill-rejected inline-flex items-center gap-1"><BellSlash size={12}/> Blocked</span>
           ) : (
-            <button data-testid="settings-enable-push" onClick={enablePush} className="px-4 py-2 rounded-md bg-foreground text-background text-sm font-semibold">
-              Enable
+            <span className="pill pill-info">Not enabled</span>
+          )}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {!pushStatus.subscribed ? (
+            <button data-testid="settings-enable-push" onClick={enablePush} disabled={pushBusy || !pushStatus.supported} className="px-4 py-2.5 rounded-md bg-brand text-brand-foreground text-sm font-semibold disabled:opacity-50 inline-flex items-center gap-2">
+              <BellRinging size={14}/> {pushBusy ? "Enabling…" : "Enable push notifications"}
             </button>
+          ) : (
+            <>
+              <button data-testid="settings-test-push" onClick={doTestPush} disabled={pushBusy} className="px-4 py-2.5 rounded-md bg-brand text-brand-foreground text-sm font-semibold inline-flex items-center gap-2">
+                <PaperPlaneTilt size={14}/> Send test push
+              </button>
+              <button data-testid="settings-disable-push" onClick={disablePush} disabled={pushBusy} className="px-4 py-2.5 rounded-md bg-secondary text-sm font-semibold inline-flex items-center gap-2">
+                <BellSlash size={14}/> Disable
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -117,7 +154,7 @@ export default function Settings() {
             placeholder="Your Telegram chat ID (e.g. 123456789)"
             className="flex-1 min-w-[200px] px-4 py-3 mono bg-surface border border-border rounded-md text-sm focus:outline-none focus:border-foreground"
           />
-          <button data-testid="settings-tg-save" onClick={saveTg} disabled={tgBusy} className="px-4 py-3 rounded-md bg-foreground text-background text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
+          <button data-testid="settings-tg-save" onClick={saveTg} disabled={tgBusy} className="px-4 py-3 rounded-md bg-brand text-brand-foreground text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
             <FloppyDisk size={14}/> Save
           </button>
           <button data-testid="settings-tg-test" onClick={testTg} disabled={tgBusy || !tgChat.trim()} className="px-4 py-3 rounded-md bg-[#229ED9] text-white text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
@@ -139,7 +176,7 @@ export default function Settings() {
             placeholder="New password" className="w-full px-4 py-3 bg-surface border border-border rounded-md text-sm" required minLength={6}/>
           <input data-testid="settings-confirm-pw" type="password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })}
             placeholder="Confirm new password" className="w-full px-4 py-3 bg-surface border border-border rounded-md text-sm" required minLength={6}/>
-          <button data-testid="settings-save-btn" disabled={busy} type="submit" className="px-5 py-3 rounded-md bg-foreground text-background text-sm font-semibold">
+          <button data-testid="settings-save-btn" disabled={busy} type="submit" className="px-5 py-3 rounded-md bg-brand text-brand-foreground text-sm font-semibold">
             {busy ? "Updating…" : "Update password"}
           </button>
         </form>

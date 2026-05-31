@@ -39,25 +39,25 @@ export default function Dashboard() {
           <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight">Your wallet at a glance.</h1>
         </div>
         <div className="flex gap-2">
-          <Link to="/app/withdrawals" data-testid="dashboard-withdraw-btn" className="px-4 py-2.5 rounded-md bg-foreground text-background text-sm font-semibold inline-flex items-center gap-2 hover-lift">
+          <Link to="/app/withdrawals" data-testid="dashboard-withdraw-btn" className="px-4 py-2.5 rounded-md bg-brand text-brand-foreground text-sm font-semibold inline-flex items-center gap-2 hover-lift shadow-lg shadow-brand/20">
             <ArrowUpRight size={16} weight="bold"/> Withdraw
           </Link>
         </div>
       </div>
 
       {/* Hero balance */}
-      <div className="card-flat p-6 md:p-8 mb-6 relative overflow-hidden bg-gradient-to-br from-card via-card to-success/5">
-        <div className="absolute -top-32 -right-20 w-96 h-96 rounded-full bg-success/[0.06] blur-3xl pointer-events-none"/>
-        <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-foreground/[0.04] blur-3xl pointer-events-none"/>
+      <div className="card-flat p-6 md:p-8 mb-6 relative overflow-hidden bg-gradient-to-br from-card via-card to-brand/5">
+        <div className="absolute -top-32 -right-20 w-96 h-96 rounded-full bg-brand/[0.08] blur-3xl pointer-events-none"/>
+        <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-brand/[0.04] blur-3xl pointer-events-none"/>
         <div className="flex flex-wrap justify-between items-start gap-6 relative">
           <div className="flex-1">
             <div className="overline text-muted-foreground mb-3 flex items-center gap-2">
-              <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"/><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success"/></span>
+              <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"/><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand"/></span>
               Available Balance {s?.wallet_frozen && <span className="ml-2 pill pill-rejected">FROZEN</span>}
             </div>
             <div className="flex items-baseline gap-3">
               <span className="font-display text-3xl md:text-4xl text-muted-foreground">₹</span>
-              <span data-testid="dashboard-balance" className="mono text-5xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+              <span data-testid="dashboard-balance" className="mono text-5xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-foreground via-foreground to-brand bg-clip-text text-transparent">
                 {show ? inr(s?.balance) : "•••••"}
               </span>
               <button onClick={() => setShow(!show)} className="ml-2 text-muted-foreground hover:text-foreground p-2 transition">
@@ -69,7 +69,7 @@ export default function Dashboard() {
               Live · updated {new Date().toLocaleTimeString()}
             </div>
           </div>
-          <div className="w-14 h-14 rounded-md bg-gradient-to-br from-foreground to-foreground/70 text-background flex items-center justify-center shadow-lg">
+          <div className="w-14 h-14 rounded-md bg-gradient-to-br from-brand to-brand/70 text-brand-foreground flex items-center justify-center shadow-lg shadow-brand/20">
             <Wallet size={26} weight="duotone"/>
           </div>
         </div>

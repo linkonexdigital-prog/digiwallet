@@ -16,6 +16,12 @@ from typing import Optional, List, Literal
 import bcrypt
 import jwt
 import httpx
+import json as _json
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption, PublicFormat
+import base64
+from pywebpush import webpush, WebPushException
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, Response, status, Query
 from fastapi.security import HTTPBearer
 from starlette.middleware.cors import CORSMiddleware
@@ -90,6 +96,52 @@ def gen_id() -> str:
 def gen_ref_id() -> str:
     """Generate user-friendly reference like digiwallet280785055101"""
     return "digiwallet" + str(secrets.randbelow(900000000000) + 100000000000)
+
+# -------------------- Web Push (VAPID) --------------------
+VAPID_KEY_FILE = ROOT_DIR / "vapid_private.pem"
+VAPID_CONTACT = "mailto:admin@digiwallet.local"
+
+def _load_or_create_vapid():
+    if VAPID_KEY_FILE.exists():
+        with open(VAPID_KEY_FILE, "rb") as f:
+            priv = serialization.load_pem_private_key(f.read(), password=None)
+    else:
+        priv = ec.generate_private_key(ec.SECP256R1())
+        with open(VAPID_KEY_FILE, "wb") as f:
+            f.write(priv.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()))
+    pub_bytes = priv.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    pub_b64 = base64.urlsafe_b64encode(pub_bytes).rstrip(b"=").decode("ascii")
+    priv_pem = priv.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode("ascii")
+    return priv_pem, pub_b64
+
+VAPID_PRIVATE_PEM, VAPID_PUBLIC_KEY_B64 = _load_or_create_vapid()
+
+async def send_web_push(user_id: str, title: str, body: str, url: str = "/app", tag: Optional[str] = None):
+    """Send web push to ALL active subscriptions of a user. Best-effort."""
+    subs = await db.push_subscriptions.find({"user_id": user_id}).to_list(20)
+    if not subs:
+        return
+    payload = _json.dumps({"title": title, "body": body, "url": url, "tag": tag or "digiwallet"})
+    dead_ids = []
+    for s in subs:
+        sub_info = s.get("subscription")
+        if not sub_info:
+            continue
+        try:
+            webpush(
+                subscription_info=sub_info,
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_PEM,
+                vapid_claims={"sub": VAPID_CONTACT},
+            )
+        except WebPushException as e:
+            sc = getattr(getattr(e, "response", None), "status_code", None)
+            if sc in (404, 410):
+                dead_ids.append(s["_id"])
+        except Exception:
+            pass
+    if dead_ids:
+        await db.push_subscriptions.delete_many({"_id": {"$in": dead_ids}})
 
 MOBILE_RE = re.compile(r"^[0-9]{10,15}$")
 
@@ -259,6 +311,7 @@ class SettingsReq(BaseModel):
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
     theme: Optional[str] = None
+    color_theme: Optional[Literal["monochrome", "emerald", "cobalt"]] = None
 
 class AdminUserUpdateReq(BaseModel):
     full_name: Optional[str] = None
@@ -333,6 +386,7 @@ async def startup():
             "seo_title": "DigiWallet V2 - Premium Digital Wallet",
             "seo_description": "Secure digital wallet for instant credits and withdrawals.",
             "theme": "dark",
+            "color_theme": "monochrome",
             "created_at": iso(now_utc()),
         })
 
@@ -365,6 +419,27 @@ async def push_notification(user_id: Optional[str], title: str, message: str, nt
         "created_at": iso(now_utc()),
     }
     await db.notifications.insert_one(doc)
+    # Fire Web Push in parallel (best-effort)
+    if user_id:
+        try:
+            await send_web_push(user_id, title, message, url="/app/notifications", tag=f"dw-{ntype}")
+        except Exception:
+            pass
+    else:
+        # broadcast: send to all subscribed users
+        try:
+            subs = await db.push_subscriptions.find({}, {"user_id": 1}).to_list(2000)
+            seen = set()
+            for s in subs:
+                uid = s.get("user_id")
+                if uid and uid not in seen:
+                    seen.add(uid)
+                    try:
+                        await send_web_push(uid, title, message, url="/app", tag=f"dw-{ntype}")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
 # -------------------- Brute Force --------------------
 async def check_lockout(identifier: str):
@@ -507,6 +582,46 @@ async def test_user_telegram(user: dict = Depends(get_current_user)):
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to send: {e}")
+    return {"ok": True}
+
+# -------- Web Push --------
+class PushSubscribeReq(BaseModel):
+    subscription: dict
+    user_agent: Optional[str] = ""
+
+@api.get("/push/public-key")
+async def push_public_key():
+    return {"public_key": VAPID_PUBLIC_KEY_B64}
+
+@api.post("/push/subscribe")
+async def push_subscribe(body: PushSubscribeReq, user: dict = Depends(get_current_user)):
+    endpoint = (body.subscription or {}).get("endpoint")
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="Invalid subscription")
+    # Upsert by endpoint (so re-subscribe doesn't duplicate)
+    await db.push_subscriptions.update_one(
+        {"endpoint": endpoint},
+        {"$set": {
+            "user_id": user["id"],
+            "endpoint": endpoint,
+            "subscription": body.subscription,
+            "user_agent": body.user_agent or "",
+            "created_at": iso(now_utc()),
+        }},
+        upsert=True,
+    )
+    return {"ok": True}
+
+@api.post("/push/unsubscribe")
+async def push_unsubscribe(body: PushSubscribeReq, user: dict = Depends(get_current_user)):
+    endpoint = (body.subscription or {}).get("endpoint")
+    if endpoint:
+        await db.push_subscriptions.delete_one({"endpoint": endpoint, "user_id": user["id"]})
+    return {"ok": True}
+
+@api.post("/push/test")
+async def push_test(user: dict = Depends(get_current_user)):
+    await send_web_push(user["id"], "🔔 DigiWallet Test", "Push notifications are working! You'll see real-time alerts even when the wallet tab is closed.", url="/app", tag="push-test")
     return {"ok": True}
 
 # ==========================================================
@@ -675,6 +790,7 @@ async def public_settings():
         "seo_description": s.get("seo_description", ""),
         "maintenance_mode": s.get("maintenance_mode", False),
         "theme": s.get("theme", "dark"),
+        "color_theme": s.get("color_theme", "monochrome"),
     }
 
 # ==========================================================
@@ -956,6 +1072,28 @@ async def admin_dashboard():
     api_today = await db.api_logs.count_documents({"created_at": {"$gte": today}})
     recent_tx = await db.transactions.find({}, {"_id": 0}).sort("created_at", -1).limit(8).to_list(8)
     recent_wd = await db.withdrawals.find({}, {"_id": 0}).sort("created_at", -1).limit(8).to_list(8)
+
+    # 7-day chart data
+    chart = []
+    for i in range(6, -1, -1):
+        day = (now_utc() - timedelta(days=i)).date().isoformat()
+        next_day = (now_utc() - timedelta(days=i - 1)).date().isoformat()
+        c = await db.transactions.aggregate([
+            {"$match": {"type": "credit", "created_at": {"$gte": day, "$lt": next_day}}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+        ]).to_list(1)
+        w = await db.transactions.aggregate([
+            {"$match": {"type": "withdrawal", "status": "paid", "created_at": {"$gte": day, "$lt": next_day}}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+        ]).to_list(1)
+        chart.append({
+            "day": day,
+            "credits": (c[0]["total"] if c else 0),
+            "withdrawals": (w[0]["total"] if w else 0),
+            "credit_count": (c[0]["count"] if c else 0),
+            "withdrawal_count": (w[0]["count"] if w else 0),
+        })
+
     return {
         "total_users": total_users,
         "active_users": active_users,
@@ -967,6 +1105,7 @@ async def admin_dashboard():
         "api_requests_today": api_today,
         "recent_transactions": recent_tx,
         "recent_withdrawals": recent_wd,
+        "chart_7d": chart,
     }
 
 # Users
