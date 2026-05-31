@@ -113,6 +113,41 @@ See `/app/memory/test_credentials.md`.
 
 ---
 
+## v2.4 Big-Bang Refactor (Feb 2026)
+
+### Backend (`server.py`) — complexity reductions
+- **`_handle_gateway_credit`** (CC 34, 146 lines) → orchestrator + 9 single-responsibility helpers:
+  - `_gw_merge_params` — merge query + JSON/form body
+  - `_gw_extract_inputs` — pull all aliased gateway inputs
+  - `_gw_make_responder` — closure that honours `format=json|text`
+  - `_gw_fail` — failed-log persistence
+  - `_gw_parse_amount` — safe float coercion
+  - `_gw_validate_api_key` — existence, status, IP-whitelist
+  - `_gw_resolve_user` — wallet number lookup + ban/freeze checks
+  - `_gw_persist_credit` — atomic credit + tx insert + counter bump
+  - `_gw_notify` — push + telegram fan-out
+- **`admin_transactions`** (CC 17) → uses new `_build_tx_filter` and `_enrich_tx_with_users` (batched single `$in` query, no N+1).
+- **`telegram_send`** (CC 15) → `_tg_load_config` + `_tg_collect_chats` + `_tg_send_one` (each chat send fails independently).
+
+### Frontend component splits
+- **`Settings.jsx`** (CC 21, 180 lines) → orchestrator + `ProfileCard`, `PushSettingsCard`, `TelegramSettingsCard`, `ChangePasswordCard`.
+- **`Withdrawals.jsx`** (CC 21, 207 lines) → orchestrator + `AddPaymentMethodForm`, `NewWithdrawalForm`, `PaymentMethodRow`, `WithdrawalHistoryTable`.
+- **`AppLayout.jsx`** (CC 16, 155 lines) → orchestrator + `SidebarNav` (shared desktop+mobile), `DesktopSidebar`, `MobileTopBar`, `MobileDrawer`, `PushPermissionBanner`.
+
+### Verification
+- ✅ Backend: 58/58 pytest tests pass (43 original + 15 new refactor regression at `/app/backend/tests/test_refactor_regression.py`).
+- ✅ Gateway credit flow (all 7 error paths + success + duplicate + JSON format) preserved 100%.
+- ✅ Admin transactions filtering + user enrichment preserved 100%.
+- ✅ Frontend: all data-testids preserved verbatim — drop-in safe.
+- ✅ webpack `compiled successfully` with **0 warnings**; eslint clean.
+- ✅ Login, navigation, theme toggle, mobile drawer, settings cards, withdrawals form all verified via Playwright.
+
+### Still pending (next logical refactor)
+- Split `server.py` (~1640 lines) into routers: `auth.py`, `wallet.py`, `transactions.py`, `gateway.py`, `admin.py`, `push.py`, with shared `core.py` for db/jwt/notifications.
+- Pagination for `/api/admin/transactions` and `/api/transactions` (limit/skip already supported on server — UI uses fixed limits).
+
+
+
 ## v2.3 Code-Quality Pass (Feb 2026)
 
 ### Applied fixes
