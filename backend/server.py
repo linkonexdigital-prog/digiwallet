@@ -738,11 +738,16 @@ async def _handle_gateway_credit(request: Request, endpoint_label: str):
         except Exception:
             pass
 
-    key = _first_param(params, ["key", "guid", "api_key", "apikey", "token"])
-    wallet = _first_param(params, ["numbe", "paytm", "wallet_number", "wallet_no", "wallet", "mobile", "mobile_number", "number"])
-    amount_raw = _first_param(params, ["amount", "amo", "amt"])
-    comment = _first_param(params, ["comment", "com", "note", "description", "desc"], "")
-    order_id = _first_param(params, ["order_id", "orderid", "order", "txnid", "txn_id", "transaction_id"], "")
+    key = _first_param(params, ["key", "guid", "api_key", "apikey", "token", "auth", "secret"])
+    wallet = _first_param(params, [
+        "numbe", "paytm", "wallet_number", "wallet_no", "wallet", "wallet_id",
+        "digiwallet", "digi_wallet", "user", "user_id", "userid", "username",
+        "mobile", "mobile_number", "number", "phone", "account", "acc", "account_no",
+        "to", "receiver", "beneficiary", "customer", "customer_id"
+    ])
+    amount_raw = _first_param(params, ["amount", "amo", "amt", "value", "sum", "rs"])
+    comment = _first_param(params, ["comment", "com", "note", "description", "desc", "remark", "remarks", "msg", "message"], "")
+    order_id = _first_param(params, ["order_id", "orderid", "order", "txnid", "txn_id", "transaction_id", "ref", "reference", "ref_id", "utr"], "")
     out_format = (_first_param(params, ["format"], "text") or "text").lower()
 
     ip = request.client.host if request.client else "unknown"
