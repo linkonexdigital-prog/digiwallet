@@ -157,33 +157,45 @@ def clean_doc(d: dict) -> dict:
     d.pop("password_hash", None)
     return d
 
-async def telegram_send(text: str, user_chat: Optional[str] = None):
-    """Best-effort telegram alert send. Sends to admin chat (if enabled) and optionally to a user's personal chat."""
+async def _tg_load_config():
     settings = await db.settings.find_one({"_id": "system"}) or {}
     token = settings.get("telegram_bot_token") or TELEGRAM_BOT_TOKEN
     admin_chat = settings.get("telegram_chat_id") or TELEGRAM_CHAT_ID
     enabled = settings.get("telegram_enabled", False)
-    if not (token and enabled):
-        # If no global token/enabled, still try to send to user chat IF token exists
-        if not token:
-            return
+    return token, admin_chat, enabled
+
+
+def _tg_collect_chats(admin_chat, enabled: bool, user_chat: Optional[str]) -> list:
     chats = []
     if enabled and admin_chat:
         chats.append(admin_chat)
     if user_chat and user_chat.strip():
         chats.append(user_chat.strip())
+    return chats
+
+
+async def _tg_send_one(ac, token: str, chat: str, text: str):
+    try:
+        await ac.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat, "text": text, "parse_mode": "HTML"},
+        )
+    except Exception:
+        pass
+
+
+async def telegram_send(text: str, user_chat: Optional[str] = None):
+    """Best-effort telegram alert send. Sends to admin chat (if enabled) and optionally to a user's personal chat."""
+    token, admin_chat, enabled = await _tg_load_config()
+    if not token:
+        return
+    chats = _tg_collect_chats(admin_chat, enabled, user_chat)
     if not chats:
         return
     try:
         async with httpx.AsyncClient(timeout=5.0) as ac:
             for chat in chats:
-                try:
-                    await ac.post(
-                        f"https://api.telegram.org/bot{token}/sendMessage",
-                        json={"chat_id": chat, "text": text, "parse_mode": "HTML"},
-                    )
-                except Exception:
-                    pass
+                await _tg_send_one(ac, token, chat, text)
     except Exception as e:
         log.warning(f"Telegram send failed: {e}")
 
@@ -901,123 +913,104 @@ def _first_param(params: dict, names: list, default=None):
                 return v
     return default
 
-async def _handle_gateway_credit(request: Request, endpoint_label: str):
+async def _gw_merge_params(request: Request) -> dict:
+    """Merge query params + JSON/form body into a single dict."""
     params = dict(request.query_params)
-    # Also merge POST form/json if present
-    if request.method == "POST":
-        try:
-            ctype = request.headers.get("content-type", "")
-            if "application/json" in ctype:
-                body = await request.json()
-                if isinstance(body, dict):
-                    for k, v in body.items():
-                        params.setdefault(k, str(v))
-            else:
-                form = await request.form()
-                for k, v in form.items():
+    if request.method != "POST":
+        return params
+    try:
+        ctype = request.headers.get("content-type", "")
+        if "application/json" in ctype:
+            body = await request.json()
+            if isinstance(body, dict):
+                for k, v in body.items():
                     params.setdefault(k, str(v))
-        except Exception:
-            pass
+        else:
+            form = await request.form()
+            for k, v in form.items():
+                params.setdefault(k, str(v))
+    except Exception:
+        pass
+    return params
 
-    key = _first_param(params, ["key", "guid", "api_key", "apikey", "token", "auth", "secret"])
-    wallet = _first_param(params, [
-        "numbe", "paytm", "wallet_number", "walletnumber", "wallet_no", "walletno",
-        "wallet", "wallet_id", "walletid", "digiwallet", "digi_wallet",
-        "user", "user_id", "userid", "username",
-        "mobile", "mobile_number", "mobilenumber", "number", "phone",
-        "account", "acc", "account_no", "accountnumber",
-        "to", "receiver", "beneficiary", "customer", "customer_id"
-    ])
-    amount_raw = _first_param(params, ["amount", "amo", "amt", "value", "sum", "rs"])
-    comment = _first_param(params, ["comment", "com", "note", "description", "desc", "remark", "remarks", "msg", "message"], "")
-    order_id = _first_param(params, ["order_id", "orderid", "order", "txnid", "txn_id", "transaction_id", "ref", "reference", "ref_id", "utr"], "")
-    out_format = (_first_param(params, ["format"], "text") or "text").lower()
 
-    ip = request.client.host if request.client else "unknown"
-    log_doc = {
-        "id": gen_id(),
-        "endpoint": endpoint_label,
-        "request": {
-            "key": (key[:8] + "...") if key else None,
-            "wallet": wallet, "amount": amount_raw,
-            "comment": comment, "order_id": order_id,
-        },
-        "ip": ip,
-        "status": "pending",
-        "error": None,
-        "created_at": iso(now_utc()),
+def _gw_extract_inputs(params: dict) -> dict:
+    """Pull all named gateway inputs out of the merged params dict using known aliases."""
+    return {
+        "key": _first_param(params, ["key", "guid", "api_key", "apikey", "token", "auth", "secret"]),
+        "wallet": _first_param(params, [
+            "numbe", "paytm", "wallet_number", "walletnumber", "wallet_no", "walletno",
+            "wallet", "wallet_id", "walletid", "digiwallet", "digi_wallet",
+            "user", "user_id", "userid", "username",
+            "mobile", "mobile_number", "mobilenumber", "number", "phone",
+            "account", "acc", "account_no", "accountnumber",
+            "to", "receiver", "beneficiary", "customer", "customer_id",
+        ]),
+        "amount_raw": _first_param(params, ["amount", "amo", "amt", "value", "sum", "rs"]),
+        "comment": _first_param(params, ["comment", "com", "note", "description", "desc", "remark", "remarks", "msg", "message"], ""),
+        "order_id": _first_param(params, ["order_id", "orderid", "order", "txnid", "txn_id", "transaction_id", "ref", "reference", "ref_id", "utr"], ""),
+        "out_format": (_first_param(params, ["format"], "text") or "text").lower(),
     }
 
+
+def _gw_make_responder(out_format: str):
+    """Return a (ok, msg, http, extra) -> Response closure that honours the format param."""
     def respond(ok: bool, msg: str, http: int = 200, extra: Optional[dict] = None):
         if out_format == "json":
             import json as _json
             payload = {"status": "SUCCESS" if ok else "ERROR", "message": msg}
-            if extra: payload.update(extra)
+            if extra:
+                payload.update(extra)
             return Response(content=_json.dumps(payload), media_type="application/json", status_code=http)
         body = f"SUCCESS: {msg}" if ok else f"ERROR: {msg}"
         return Response(content=body, media_type="text/plain", status_code=http)
+    return respond
 
-    if not key:
-        log_doc["status"] = "failed"; log_doc["error"] = "Missing API key"; log_doc["error_type"] = "missing_key"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, "Missing API key (key/guid)", 400)
-    if not wallet:
-        log_doc["status"] = "failed"; log_doc["error"] = "Missing wallet number"; log_doc["error_type"] = "missing_wallet"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, "Missing wallet number (paytm/numbe/wallet_number)", 400)
 
-    # Parse amount
+async def _gw_fail(log_doc: dict, err_type: str, message: str):
+    """Persist a failed api_log row with the given error tag."""
+    log_doc["status"] = "failed"
+    log_doc["error"] = message
+    log_doc["error_type"] = err_type
+    await db.api_logs.insert_one(log_doc)
+
+
+def _gw_parse_amount(raw):
     try:
-        amt = float(amount_raw)
-        if amt <= 0: raise ValueError
+        amt = float(raw)
+        if amt <= 0:
+            raise ValueError
+        return amt
     except Exception:
-        log_doc["status"] = "failed"; log_doc["error"] = "Invalid amount"; log_doc["error_type"] = "invalid_amount"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, "Invalid amount", 400)
+        return None
 
-    # Validate API key
+
+async def _gw_validate_api_key(key: str, ip: str):
+    """Return (api_key, error_tuple). error_tuple is (err_type, message, http) or None."""
     api_key = await db.api_keys.find_one({"key": key})
     if not api_key:
-        log_doc["status"] = "failed"; log_doc["error"] = "Invalid API key"; log_doc["error_type"] = "invalid_key"
-        await db.api_logs.insert_one(log_doc)
-        await telegram_send(f"<b>API INVALID_KEY</b>\nEndpoint: {endpoint_label}\nIP: {ip}\nKey: {key[:8]}...")
-        return respond(False, "Invalid API key", 401)
+        return None, ("invalid_key", "Invalid API key", 401)
     if api_key["status"] != "active":
-        log_doc["status"] = "failed"; log_doc["error"] = "API key paused"; log_doc["error_type"] = "paused_key"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, "API key is paused", 403)
+        return api_key, ("paused_key", "API key is paused", 403)
     if api_key.get("ip_whitelist") and ip not in api_key["ip_whitelist"]:
-        log_doc["status"] = "failed"; log_doc["error"] = f"IP {ip} not whitelisted"; log_doc["error_type"] = "ip_blocked"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, "IP not whitelisted", 403)
-    log_doc["api_key_id"] = api_key["id"]
+        return api_key, ("ip_blocked", f"IP {ip} not whitelisted", 403)
+    return api_key, None
 
-    # Resolve user by mobile/wallet number
-    wallet = str(wallet).strip()
-    user = await db.users.find_one({"mobile_number": wallet})
+
+async def _gw_resolve_user(wallet: str):
+    """Return (user, error_tuple) for the wallet number."""
+    user = await db.users.find_one({"mobile_number": str(wallet).strip()})
     if not user:
-        log_doc["status"] = "failed"; log_doc["error"] = f"Wallet {wallet} not found"; log_doc["error_type"] = "user_not_found"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, f"Wallet {wallet} not found", 404)
+        return None, ("user_not_found", f"Wallet {wallet} not found", 404)
     if user.get("status") == "banned":
-        log_doc["status"] = "failed"; log_doc["error"] = "User banned"; log_doc["error_type"] = "user_banned"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, "User is banned", 403)
+        return user, ("user_banned", "User is banned", 403)
     if user.get("wallet_frozen"):
-        log_doc["status"] = "failed"; log_doc["error"] = "Wallet frozen"; log_doc["error_type"] = "wallet_frozen"
-        await db.api_logs.insert_one(log_doc)
-        return respond(False, "Wallet is frozen", 403)
+        return user, ("wallet_frozen", "Wallet is frozen", 403)
+    return user, None
 
-    # Duplicate detection: prefer order_id, else fallback to comment
-    dup_key = (str(order_id) or str(comment) or "").strip()
-    if dup_key:
-        dup = await db.transactions.find_one({"external_txn_id": dup_key, "api_key_id": api_key["id"]})
-        if dup:
-            log_doc["status"] = "duplicate"; log_doc["error"] = "Duplicate order_id"; log_doc["error_type"] = "duplicate"
-            await db.api_logs.insert_one(log_doc)
-            return respond(False, "Duplicate transaction", 409, {"order_id": dup_key})
 
-    # Credit wallet
+async def _gw_persist_credit(user: dict, amt: float, comment: str, dup_key: str, api_key: dict, endpoint_label: str) -> dict:
+    """Atomically credit the user, insert tx, bump api_key counters. Returns the tx doc."""
     await db.users.update_one({"id": user["id"]}, {"$inc": {"balance": amt}})
     tx = {
         "id": gen_id(),
@@ -1034,18 +1027,93 @@ async def _handle_gateway_credit(request: Request, endpoint_label: str):
         "created_at": iso(now_utc()),
     }
     await db.transactions.insert_one(tx)
-    await db.api_keys.update_one({"id": api_key["id"]}, {"$inc": {"requests_today": 1}, "$set": {"last_used_at": iso(now_utc())}})
-    log_doc["status"] = "success"; log_doc["txn_id"] = tx["id"]
-    await db.api_logs.insert_one(log_doc)
+    await db.api_keys.update_one(
+        {"id": api_key["id"]},
+        {"$inc": {"requests_today": 1}, "$set": {"last_used_at": iso(now_utc())}},
+    )
+    return tx
 
-    new_bal = user.get("balance", 0) + amt
-    await push_notification(user["id"], "Money Credited", f"₹{amt} · credited for {(comment or 'Gateway credit')[:60]} · {fmt_when()}", "success")
+
+async def _gw_notify(user: dict, amt: float, comment: str, tx: dict):
+    await push_notification(
+        user["id"],
+        "Money Credited",
+        f"₹{amt} · credited for {(comment or 'Gateway credit')[:60]} · {fmt_when()}",
+        "success",
+    )
     await telegram_send(
         f"<b>💰 Money Credited!</b>\nAmount: <b>₹{amt}</b>\nRef: <code>{tx['ref_id']}</code>\nComment: {comment or '—'}",
         user_chat=user.get("telegram_chat_id"),
     )
 
-    return respond(True, f"Credited {amt} to {wallet}", 200, {
+
+async def _handle_gateway_credit(request: Request, endpoint_label: str):
+    params = await _gw_merge_params(request)
+    inp = _gw_extract_inputs(params)
+    respond = _gw_make_responder(inp["out_format"])
+
+    ip = request.client.host if request.client else "unknown"
+    log_doc = {
+        "id": gen_id(),
+        "endpoint": endpoint_label,
+        "request": {
+            "key": (inp["key"][:8] + "...") if inp["key"] else None,
+            "wallet": inp["wallet"], "amount": inp["amount_raw"],
+            "comment": inp["comment"], "order_id": inp["order_id"],
+        },
+        "ip": ip,
+        "status": "pending",
+        "error": None,
+        "created_at": iso(now_utc()),
+    }
+
+    if not inp["key"]:
+        await _gw_fail(log_doc, "missing_key", "Missing API key")
+        return respond(False, "Missing API key (key/guid)", 400)
+    if not inp["wallet"]:
+        await _gw_fail(log_doc, "missing_wallet", "Missing wallet number")
+        return respond(False, "Missing wallet number (paytm/numbe/wallet_number)", 400)
+
+    amt = _gw_parse_amount(inp["amount_raw"])
+    if amt is None:
+        await _gw_fail(log_doc, "invalid_amount", "Invalid amount")
+        return respond(False, "Invalid amount", 400)
+
+    api_key, key_err = await _gw_validate_api_key(inp["key"], ip)
+    if key_err:
+        err_type, msg, http = key_err
+        await _gw_fail(log_doc, err_type, msg)
+        if err_type == "invalid_key":
+            await telegram_send(f"<b>API INVALID_KEY</b>\nEndpoint: {endpoint_label}\nIP: {ip}\nKey: {inp['key'][:8]}...")
+        return respond(False, msg, http)
+    log_doc["api_key_id"] = api_key["id"]
+
+    user, user_err = await _gw_resolve_user(inp["wallet"])
+    if user_err:
+        err_type, msg, http = user_err
+        await _gw_fail(log_doc, err_type, msg)
+        return respond(False, msg, http)
+
+    # Duplicate detection: prefer order_id, else fallback to comment
+    dup_key = (str(inp["order_id"]) or str(inp["comment"]) or "").strip()
+    if dup_key:
+        dup = await db.transactions.find_one({"external_txn_id": dup_key, "api_key_id": api_key["id"]})
+        if dup:
+            log_doc["status"] = "duplicate"
+            log_doc["error"] = "Duplicate order_id"
+            log_doc["error_type"] = "duplicate"
+            await db.api_logs.insert_one(log_doc)
+            return respond(False, "Duplicate transaction", 409, {"order_id": dup_key})
+
+    tx = await _gw_persist_credit(user, amt, inp["comment"], dup_key, api_key, endpoint_label)
+    log_doc["status"] = "success"
+    log_doc["txn_id"] = tx["id"]
+    await db.api_logs.insert_one(log_doc)
+
+    new_bal = user.get("balance", 0) + amt
+    await _gw_notify(user, amt, inp["comment"], tx)
+
+    return respond(True, f"Credited {amt} to {inp['wallet']}", 200, {
         "txn_id": tx["id"], "ref_id": tx["ref_id"], "order_id": dup_key, "new_balance": new_bal, "user_id": user["id"]
     })
 
@@ -1437,19 +1505,11 @@ async def admin_telegram_test():
     await telegram_send("<b>Test Alert</b>\nDigiWallet V2 Telegram integration is working ✅")
     return {"ok": True}
 
-@admin_router.get("/transactions")
-async def admin_transactions(
-    q: Optional[str] = None,
-    type: Optional[str] = None,
-    status: Optional[str] = None,
-    user_id: Optional[str] = None,
-    min_amount: Optional[float] = None,
-    max_amount: Optional[float] = None,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
-    limit: int = 100,
-    skip: int = 0,
-):
+def _build_tx_filter(
+    q=None, type=None, status=None, user_id=None,
+    min_amount=None, max_amount=None, from_date=None, to_date=None,
+) -> dict:
+    """Build a MongoDB filter dict for transactions from optional query params."""
     filt = {}
     if type: filt["type"] = type
     if status: filt["status"] = status
@@ -1471,18 +1531,43 @@ async def admin_transactions(
             {"external_txn_id": {"$regex": q, "$options": "i"}},
             {"id": q},
         ]
-    items = await db.transactions.find(filt, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    # Enrich with user info
+    return filt
+
+
+async def _enrich_tx_with_users(items: list) -> None:
+    """In-place: add user_name & user_mobile to each tx based on user_id lookup."""
     uids = list({i["user_id"] for i in items if i.get("user_id")})
-    users = await db.users.find({"id": {"$in": uids}}, {"_id": 0, "id": 1, "full_name": 1, "mobile_number": 1}).to_list(len(uids))
+    if not uids:
+        return
+    users = await db.users.find(
+        {"id": {"$in": uids}},
+        {"_id": 0, "id": 1, "full_name": 1, "mobile_number": 1},
+    ).to_list(len(uids))
     umap = {u["id"]: u for u in users}
     for it in items:
         u = umap.get(it.get("user_id"))
         if u:
             it["user_name"] = u["full_name"]
             it["user_mobile"] = u["mobile_number"]
+
+
+@admin_router.get("/transactions")
+async def admin_transactions(
+    q: Optional[str] = None,
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    user_id: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    limit: int = 100,
+    skip: int = 0,
+):
+    filt = _build_tx_filter(q, type, status, user_id, min_amount, max_amount, from_date, to_date)
+    items = await db.transactions.find(filt, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    await _enrich_tx_with_users(items)
     total = await db.transactions.count_documents(filt)
-    # Summary stats
     summary = await db.transactions.aggregate([
         {"$match": filt},
         {"$group": {"_id": "$type", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},

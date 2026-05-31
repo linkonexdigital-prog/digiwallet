@@ -1,0 +1,39 @@
+{
+  "summary": "Regression test of DigiWallet V2 big-bang refactor (backend _gw_* helpers, _build_tx_filter/_enrich_tx_with_users, _tg_* helpers; frontend Settings/Withdrawals/AppLayout splits). 58/58 pytest tests pass (43 original + 15 new refactor regression). Frontend Playwright run confirms all required data-testids render correctly, change-password & telegram inputs accept text, Add-PM expands AddPaymentMethodForm (UPI/Bank toggle works), all 5 sidebar nav links present, theme toggle flips theme, mobile drawer opens. No behavior changed by the refactor.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/add_balance.php", "issue": "new_balance in JSON response is computed in-memory (user.get('balance') + amt) without re-reading the user after $inc. Safe today (sequential awaits) but a true read-after-write would be more robust under concurrency. Carried over from iteration_1."},
+      {"endpoint": "/api/admin/transactions", "issue": "from_date/to_date are compared as strings against created_at (ISO datetime string). Works as a lex prefix today; would silently misbehave if format changes. Carried over from iteration_1."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_refactor_regression.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/refactor_results.xml",
+    "/app/test_reports/pytest/all_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Refactor reads cleanly: _gw_merge_params / _gw_extract_inputs / _gw_make_responder / _gw_validate_api_key / _gw_resolve_user / _gw_persist_credit / _gw_notify are well-factored single-responsibility helpers; _handle_gateway_credit is now a thin orchestrator.",
+    "_build_tx_filter and _enrich_tx_with_users are pure helpers and reusable. _enrich_tx_with_users correctly batches user lookups with a single $in query (no N+1).",
+    "telegram_send split into _tg_load_config / _tg_collect_chats / _tg_send_one improves testability; _tg_send_one swallows exceptions per-chat which is correct (best-effort send).",
+    "server.py is still ~1640 lines — splitting into routers (auth/wallet/admin/gateway) modules is the next logical refactor.",
+    "Frontend splits (Settings -> ProfileCard/PushSettingsCard/TelegramSettingsCard/ChangePasswordCard; Withdrawals -> AddPaymentMethodForm/NewWithdrawalForm/PaymentMethodRow/WithdrawalHistoryTable; AppLayout -> DesktopSidebar/MobileTopBar/MobileDrawer/PushPermissionBanner/SidebarNav) keep all existing data-testids verbatim — drop-in safe."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_refactor_regression.py (new — 15 tests)"
+  ],
+  "success_rate": {"backend": "100% (58/58)", "frontend": "100% of critical flows verified"},
+  "test_credentials": "Admin 9999999999 / Admin@123 ; User 8888888888 / Test@123 (both verified). API key fetched dynamically via GET /api/admin/api-keys.",
+  "seed_data_creation": "Tests register a temporary 7xxxxxxxxx user and create 3 gateway-credit transactions on user 8888888888 (small amounts: 55.5, 12.34, 1.0) with unique order_ids. No production/seed data modified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Refactor regression suite is at /app/backend/tests/test_refactor_regression.py and is reusable. Frontend uses these stable data-testids: settings-{enable-push,tg-chat-input,tg-save,current-pw,new-pw,confirm-pw,save-btn}; withdraw-{open-btn,amount-input,method-select,submit-btn}; pm-{upi-input,account-input,save-btn}; add-pm-btn; sidebar-{overview,transactions,withdrawals,notifications,settings}-link; theme-toggle-desktop; logout-button; enable-push-btn; mobile-menu-toggle. Note: push-permission-banner only renders when Notification.permission==='default'; in the preview browser it is 'denied'/'blocked', which is why enable-push-btn is absent on the layout (not a bug). UPI/Bank toggle buttons in AddPaymentMethodForm do not have dedicated data-testids — consider adding pm-type-upi / pm-type-bank for cleaner future tests.",
+  "rca of the issue": "No issues found; refactor is behavior-preserving."
+}
