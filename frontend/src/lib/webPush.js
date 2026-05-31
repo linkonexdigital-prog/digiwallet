@@ -65,8 +65,8 @@ export async function unsubscribeFromPush() {
   if (!reg) return { ok: true };
   const sub = await reg.pushManager.getSubscription();
   if (sub) {
-    try { await api.post("/push/unsubscribe", { subscription: sub.toJSON() }); } catch (_) {}
-    try { await sub.unsubscribe(); } catch (_) {}
+    try { await api.post("/push/unsubscribe", { subscription: sub.toJSON() }); } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
+    try { await sub.unsubscribe(); } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
   }
   return { ok: true };
 }
@@ -82,7 +82,7 @@ export async function getPushStatus() {
       const sub = await reg.pushManager.getSubscription();
       subscribed = !!sub;
     }
-  } catch (_) {}
+  } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
   return { supported: true, permission: Notification.permission, subscribed };
 }
 

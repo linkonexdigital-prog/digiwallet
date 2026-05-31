@@ -25,7 +25,7 @@ export default function Withdrawals() {
         api.get("/wallet/summary"),
       ]);
       setPms(a.data); setWithdrawals(b.data); setBalance(c.data.balance);
-    } catch (_) {}
+    } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
   };
   useEffect(() => { load(); }, []);
 

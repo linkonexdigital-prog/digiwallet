@@ -86,8 +86,8 @@ export default function Landing() {
                   { t: "API Credit", a: "+ ₹ 5,000", c: "success" },
                   { t: "UPI Withdrawal", a: "- ₹ 2,500", c: "destructive" },
                   { t: "API Credit", a: "+ ₹ 12,000", c: "success" },
-                ].map((r, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm py-2 border-b border-border last:border-b-0">
+                ].map((r) => (
+                  <div key={r.t + r.a} className="flex justify-between items-center text-sm py-2 border-b border-border last:border-b-0">
                     <span className="flex items-center gap-2">
                       <CheckCircle size={14} className="text-muted-foreground"/>
                       {r.t}
@@ -111,13 +111,13 @@ export default function Landing() {
             { i: ShieldCheck, t: "Bank-grade Security", d: "Bcrypt password hashing, brute-force protection, device tracking, and force logout on every session." },
             { i: ChartBar, t: "Real-time Insights", d: "Live balance, total credits, total withdrawals, pending counts. Updated the moment they happen." },
             { i: BellRinging, t: "Notifications", d: "In-app bell + Telegram alerts for credits, withdrawals, approvals, and security events." },
-            { i: Wallet, t: "UPI &amp; Bank", d: "Add multiple UPI handles and bank accounts. Withdraw to the method you trust." },
+            { i: Wallet, t: "UPI & Bank", d: "Add multiple UPI handles and bank accounts. Withdraw to the method you trust." },
             { i: CheckCircle, t: "Audit Ready", d: "Every credit, debit, approval, and admin action is logged immutably." },
           ].map(({ i: Ic, t, d }) => (
             <div key={t} className="card-flat p-6 hover-lift">
               <Ic size={22} weight="duotone" className="mb-4"/>
               <div className="font-display text-lg font-bold mb-2">{t}</div>
-              <div className="text-sm text-muted-foreground leading-relaxed" dangerouslySetInnerHTML={{__html:d}}/>
+              <div className="text-sm text-muted-foreground leading-relaxed">{d}</div>
             </div>
           ))}
         </div>

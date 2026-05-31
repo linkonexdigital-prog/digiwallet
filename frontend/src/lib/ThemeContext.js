@@ -32,7 +32,7 @@ export const ThemeProvider = ({ children }) => {
         if (srv && VALID_COLOR_THEMES.includes(srv) && srv !== colorTheme) {
           setColorTheme(srv);
         }
-      } catch (_) {}
+      } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
     };
     fetch();
     const i = setInterval(() => alive && fetch(), 60000);

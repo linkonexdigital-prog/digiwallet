@@ -40,14 +40,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    try { await api.post("/auth/logout"); } catch (_) {}
+    try { await api.post("/auth/logout"); } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
     localStorage.removeItem("dw_token");
     setUser(false);
     window.location.href = "/login";
   };
 
   const refresh = async () => {
-    try { const r = await api.get("/auth/me"); setUser(r.data); } catch (_) {}
+    try { const r = await api.get("/auth/me"); setUser(r.data); } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
   };
 
   const loginAs = (token, u) => {

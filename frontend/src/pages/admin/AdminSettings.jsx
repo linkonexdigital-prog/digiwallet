@@ -71,8 +71,8 @@ export default function AdminSettings() {
                 className={`text-left p-4 rounded-md border-2 transition relative ${(s.color_theme || "monochrome") === t.id ? "border-foreground bg-surface" : "border-border hover:border-foreground/40"}`}
               >
                 <div className="flex gap-1.5 mb-3">
-                  {t.swatches.map((c, i) => (
-                    <span key={i} style={{ background: c }} className="w-7 h-7 rounded-full border border-border"/>
+                  {t.swatches.map((c) => (
+                    <span key={c} style={{ background: c }} className="w-7 h-7 rounded-full border border-border"/>
                   ))}
                 </div>
                 <div className="font-semibold text-sm">{t.name}</div>

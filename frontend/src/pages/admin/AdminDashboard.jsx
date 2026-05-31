@@ -19,7 +19,7 @@ export default function AdminDashboard() {
   const [d, setD] = useState(null);
   useEffect(() => {
     let m = true;
-    const load = async () => { try { const r = await api.get("/admin/dashboard"); if (m) setD(r.data); } catch (_) {} };
+    const load = async () => { try { const r = await api.get("/admin/dashboard"); if (m) setD(r.data); } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); } };
     load(); const i = setInterval(load, 12000); return () => { m = false; clearInterval(i); };
   }, []);
 

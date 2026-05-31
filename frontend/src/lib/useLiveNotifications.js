@@ -46,13 +46,13 @@ export function useLiveNotifications(enabled = true) {
         playPing();
         return;
       }
-    } catch (_) {}
+    } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
     // Fallback: page-level notification
     try {
       const bn = new Notification(n.title, opts);
       bn.onclick = () => { window.focus(); window.location.href = "/app/notifications"; };
       playPing();
-    } catch (_) {}
+    } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
   };
 
   // Simple WebAudio ping (subtle confirm sound)
@@ -70,7 +70,7 @@ export function useLiveNotifications(enabled = true) {
       g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.35);
       o.start(); o.stop(ac.currentTime + 0.4);
       setTimeout(() => { try { ac.close(); } catch (_){} }, 600);
-    } catch (_) {}
+    } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
   };
 
   // Ensure SW is registered ASAP
@@ -109,7 +109,7 @@ export function useLiveNotifications(enabled = true) {
           seenIds.current.add(n.id);
           await showNotification(n);
         }
-      } catch (_) {}
+      } catch (e) { if (process.env.NODE_ENV !== "production") console.debug("[dw]", e); }
     };
     tick();
     const i = setInterval(tick, 5000); // 5s for near-real-time
