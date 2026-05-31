@@ -87,6 +87,10 @@ def gen_api_key() -> str:
 def gen_id() -> str:
     return uuid.uuid4().hex
 
+def gen_ref_id() -> str:
+    """Generate user-friendly reference like digiwallet280785055101"""
+    return "digiwallet" + str(secrets.randbelow(900000000000) + 100000000000)
+
 MOBILE_RE = re.compile(r"^[0-9]{10,15}$")
 
 def clean_doc(d: dict) -> dict:
@@ -96,20 +100,33 @@ def clean_doc(d: dict) -> dict:
     d.pop("password_hash", None)
     return d
 
-async def telegram_send(text: str):
-    """Best-effort telegram alert send."""
+async def telegram_send(text: str, user_chat: Optional[str] = None):
+    """Best-effort telegram alert send. Sends to admin chat (if enabled) and optionally to a user's personal chat."""
     settings = await db.settings.find_one({"_id": "system"}) or {}
     token = settings.get("telegram_bot_token") or TELEGRAM_BOT_TOKEN
-    chat = settings.get("telegram_chat_id") or TELEGRAM_CHAT_ID
+    admin_chat = settings.get("telegram_chat_id") or TELEGRAM_CHAT_ID
     enabled = settings.get("telegram_enabled", False)
-    if not (enabled and token and chat):
+    if not (token and enabled):
+        # If no global token/enabled, still try to send to user chat IF token exists
+        if not token:
+            return
+    chats = []
+    if enabled and admin_chat:
+        chats.append(admin_chat)
+    if user_chat and user_chat.strip():
+        chats.append(user_chat.strip())
+    if not chats:
         return
     try:
         async with httpx.AsyncClient(timeout=5.0) as ac:
-            await ac.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat, "text": text, "parse_mode": "HTML"},
-            )
+            for chat in chats:
+                try:
+                    await ac.post(
+                        f"https://api.telegram.org/bot{token}/sendMessage",
+                        json={"chat_id": chat, "text": text, "parse_mode": "HTML"},
+                    )
+                except Exception:
+                    pass
     except Exception as e:
         log.warning(f"Telegram send failed: {e}")
 
@@ -457,6 +474,41 @@ async def change_password(body: ChangePwReq, user: dict = Depends(get_current_us
     await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": hash_password(body.new_password)}})
     return {"ok": True}
 
+class TelegramConfigReq(BaseModel):
+    telegram_chat_id: str = ""
+
+@api.post("/auth/telegram")
+async def set_telegram(body: TelegramConfigReq, user: dict = Depends(get_current_user)):
+    chat = (body.telegram_chat_id or "").strip()
+    await db.users.update_one({"id": user["id"]}, {"$set": {"telegram_chat_id": chat}})
+    return {"ok": True}
+
+@api.post("/auth/telegram/test")
+async def test_user_telegram(user: dict = Depends(get_current_user)):
+    fresh = await db.users.find_one({"id": user["id"]})
+    chat = (fresh or {}).get("telegram_chat_id", "").strip()
+    if not chat:
+        raise HTTPException(status_code=400, detail="No Telegram chat ID configured")
+    settings = await db.settings.find_one({"_id": "system"}) or {}
+    token = settings.get("telegram_bot_token") or TELEGRAM_BOT_TOKEN
+    if not token:
+        raise HTTPException(status_code=400, detail="Telegram bot not configured by admin")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as ac:
+            r = await ac.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat,
+                      "text": f"<b>🎉 Hello {fresh['full_name']}!</b>\nDigiWallet alerts are now <b>active</b> on this chat. You will receive instant notifications for credits, withdrawals and approvals.",
+                      "parse_mode": "HTML"},
+            )
+            if r.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Telegram error: {r.text[:120]}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to send: {e}")
+    return {"ok": True}
+
 # ==========================================================
 # USER ROUTES
 # ==========================================================
@@ -558,6 +610,7 @@ async def submit_withdrawal(body: WithdrawalReq, user: dict = Depends(require_ac
     # Also a transaction
     tx = {
         "id": gen_id(),
+        "ref_id": gen_ref_id(),
         "user_id": user["id"],
         "type": "withdrawal",
         "amount": body.amount,
@@ -568,7 +621,10 @@ async def submit_withdrawal(body: WithdrawalReq, user: dict = Depends(require_ac
     }
     await db.transactions.insert_one(tx)
     await push_notification(user["id"], "Withdrawal Submitted", f"Your withdrawal of ₹{body.amount} is pending review.", "info")
-    await telegram_send(f"<b>New Withdrawal</b>\nUser: {user['full_name']} ({user['mobile_number']})\nAmount: ₹{body.amount}\nMethod: {pm['type'].upper()}")
+    await telegram_send(
+        f"<b>📤 Withdrawal Submitted</b>\nAmount: <b>₹{body.amount}</b>\nMethod: {pm['type'].upper()}\nRef: {tx['ref_id']}\nStatus: Pending review",
+        user_chat=user.get("telegram_chat_id"),
+    )
     wd.pop("_id", None)
     return wd
 
@@ -676,6 +732,7 @@ async def credit_api(body: CreditApiReq, request: Request):
     await db.users.update_one({"id": body.user_id}, {"$inc": {"balance": body.amount}})
     tx = {
         "id": gen_id(),
+        "ref_id": gen_ref_id(),
         "user_id": body.user_id,
         "type": "credit",
         "amount": body.amount,
@@ -692,10 +749,13 @@ async def credit_api(body: CreditApiReq, request: Request):
     log_doc["txn_id"] = tx["id"]
     await db.api_logs.insert_one(log_doc)
 
-    await push_notification(body.user_id, "Money Credited", f"₹{body.amount} credited to your wallet. TXN: {body.txn_id}", "success")
-    await telegram_send(f"<b>New Credit</b>\nUser: {user['full_name']}\nAmount: ₹{body.amount}\nTXN: {body.txn_id}")
+    await push_notification(body.user_id, "Money Credited", f"₹{body.amount} credited to your wallet. Ref: {tx['ref_id']}", "success")
+    await telegram_send(
+        f"<b>💰 Money Credited!</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>\nTXN: {body.txn_id}",
+        user_chat=user.get("telegram_chat_id"),
+    )
 
-    return {"success": True, "txn_id": tx["id"], "external_txn_id": body.txn_id, "new_balance": user.get("balance", 0) + body.amount}
+    return {"success": True, "txn_id": tx["id"], "ref_id": tx["ref_id"], "external_txn_id": body.txn_id, "new_balance": user.get("balance", 0) + body.amount}
 
 # ==========================================================
 # GATEWAY COMPATIBILITY ENDPOINT
@@ -840,6 +900,7 @@ async def _handle_gateway_credit(request: Request, endpoint_label: str):
     await db.users.update_one({"id": user["id"]}, {"$inc": {"balance": amt}})
     tx = {
         "id": gen_id(),
+        "ref_id": gen_ref_id(),
         "user_id": user["id"],
         "type": "credit",
         "amount": amt,
@@ -857,11 +918,14 @@ async def _handle_gateway_credit(request: Request, endpoint_label: str):
     await db.api_logs.insert_one(log_doc)
 
     new_bal = user.get("balance", 0) + amt
-    await push_notification(user["id"], "Money Credited", f"₹{amt} credited to your wallet. {comment or ''}".strip(), "success")
-    await telegram_send(f"<b>New Credit</b>\nEndpoint: {endpoint_label}\nUser: {user['full_name']} ({wallet})\nAmount: ₹{amt}\nOrder: {dup_key or '—'}")
+    await push_notification(user["id"], "Money Credited", f"₹{amt} credited to your wallet. Ref: {tx['ref_id']}", "success")
+    await telegram_send(
+        f"<b>💰 Money Credited!</b>\nAmount: <b>₹{amt}</b>\nRef: <code>{tx['ref_id']}</code>\nComment: {comment or '—'}",
+        user_chat=user.get("telegram_chat_id"),
+    )
 
     return respond(True, f"Credited {amt} to {wallet}", 200, {
-        "txn_id": tx["id"], "order_id": dup_key, "new_balance": new_bal, "user_id": user["id"]
+        "txn_id": tx["id"], "ref_id": tx["ref_id"], "order_id": dup_key, "new_balance": new_bal, "user_id": user["id"]
     })
 
 
@@ -957,12 +1021,16 @@ async def admin_wallet_credit(body: AdminCreditReq, admin: dict = Depends(requir
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await db.users.update_one({"id": body.user_id}, {"$inc": {"balance": body.amount}})
-    tx = {"id": gen_id(), "user_id": body.user_id, "type": "credit", "amount": body.amount,
+    tx = {"id": gen_id(), "ref_id": gen_ref_id(), "user_id": body.user_id, "type": "credit", "amount": body.amount,
           "status": "completed", "description": f"Manual credit by admin. {body.note or ''}".strip(),
           "admin_id": admin["id"], "created_at": iso(now_utc())}
     await db.transactions.insert_one(tx)
-    await push_notification(body.user_id, "Manual Credit", f"₹{body.amount} credited to your wallet.", "success")
-    return {"ok": True, "txn_id": tx["id"]}
+    await push_notification(body.user_id, "Manual Credit", f"₹{body.amount} credited to your wallet. Ref: {tx['ref_id']}", "success")
+    await telegram_send(
+        f"<b>💰 Manual Credit</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>\nBy admin",
+        user_chat=user.get("telegram_chat_id"),
+    )
+    return {"ok": True, "txn_id": tx["id"], "ref_id": tx["ref_id"]}
 
 @admin_router.post("/wallet/debit")
 async def admin_wallet_debit(body: AdminDebitReq, admin: dict = Depends(require_admin)):
@@ -972,12 +1040,16 @@ async def admin_wallet_debit(body: AdminDebitReq, admin: dict = Depends(require_
     if user.get("balance", 0) < body.amount:
         raise HTTPException(status_code=400, detail="Insufficient balance")
     await db.users.update_one({"id": body.user_id}, {"$inc": {"balance": -body.amount}})
-    tx = {"id": gen_id(), "user_id": body.user_id, "type": "debit", "amount": body.amount,
+    tx = {"id": gen_id(), "ref_id": gen_ref_id(), "user_id": body.user_id, "type": "debit", "amount": body.amount,
           "status": "completed", "description": f"Manual debit by admin. {body.note or ''}".strip(),
           "admin_id": admin["id"], "created_at": iso(now_utc())}
     await db.transactions.insert_one(tx)
-    await push_notification(body.user_id, "Manual Debit", f"₹{body.amount} debited from your wallet.", "warning")
-    return {"ok": True, "txn_id": tx["id"]}
+    await push_notification(body.user_id, "Manual Debit", f"₹{body.amount} debited from your wallet. Ref: {tx['ref_id']}", "warning")
+    await telegram_send(
+        f"<b>📤 Manual Debit</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>",
+        user_chat=user.get("telegram_chat_id"),
+    )
+    return {"ok": True, "txn_id": tx["id"], "ref_id": tx["ref_id"]}
 
 @admin_router.post("/wallet/adjust")
 async def admin_wallet_adjust(body: AdminAdjustReq, admin: dict = Depends(require_admin)):
@@ -986,11 +1058,11 @@ async def admin_wallet_adjust(body: AdminAdjustReq, admin: dict = Depends(requir
         raise HTTPException(status_code=404, detail="User not found")
     delta = body.new_balance - user.get("balance", 0)
     await db.users.update_one({"id": body.user_id}, {"$set": {"balance": body.new_balance}})
-    tx = {"id": gen_id(), "user_id": body.user_id, "type": "adjustment", "amount": delta,
+    tx = {"id": gen_id(), "ref_id": gen_ref_id(), "user_id": body.user_id, "type": "adjustment", "amount": delta,
           "status": "completed", "description": f"Balance adjusted. {body.note or ''}".strip(),
           "admin_id": admin["id"], "created_at": iso(now_utc())}
     await db.transactions.insert_one(tx)
-    return {"ok": True}
+    return {"ok": True, "ref_id": tx["ref_id"]}
 
 @admin_router.post("/wallet/{user_id}/freeze")
 async def admin_freeze(user_id: str):
@@ -1016,7 +1088,7 @@ async def admin_reverse_tx(tx_id: str, admin: dict = Depends(require_admin)):
     else:
         raise HTTPException(status_code=400, detail="Only credit/debit can be reversed")
     await db.transactions.update_one({"id": tx_id}, {"$set": {"reversed": True}})
-    rev = {"id": gen_id(), "user_id": tx["user_id"], "type": "reversal",
+    rev = {"id": gen_id(), "ref_id": gen_ref_id(), "user_id": tx["user_id"], "type": "reversal",
            "amount": tx["amount"], "status": "completed",
            "description": f"Reversal of {tx_id}", "admin_id": admin["id"],
            "created_at": iso(now_utc())}
@@ -1057,10 +1129,15 @@ async def _process_wd(wid: str, action: str, note: str, admin_id: str):
     await db.transactions.update_many({"related_id": wid}, {"$set": {"status": new_status}})
     title_map = {"approved": "Withdrawal Approved", "rejected": "Withdrawal Rejected", "paid": "Withdrawal Paid"}
     nt_map = {"approved": "info", "rejected": "warning", "paid": "success"}
+    emoji_map = {"approved": "✅", "rejected": "❌", "paid": "💸"}
+    user_doc = await db.users.find_one({"id": wd["user_id"]})
     if new_status in title_map:
         await push_notification(wd["user_id"], title_map[new_status],
                                 f"Your withdrawal of ₹{wd['amount']} has been {new_status}.", nt_map[new_status])
-    await telegram_send(f"<b>Withdrawal {new_status.upper()}</b>\nUser: {wd['user_name']}\nAmount: ₹{wd['amount']}")
+    await telegram_send(
+        f"<b>{emoji_map.get(new_status, '')} Withdrawal {new_status.upper()}</b>\nAmount: <b>₹{wd['amount']}</b>\nMethod: {wd.get('method', '').upper()}",
+        user_chat=(user_doc or {}).get("telegram_chat_id"),
+    )
     return await db.withdrawals.find_one({"id": wid}, {"_id": 0})
 
 @admin_router.post("/withdrawals/{wid}/approve")

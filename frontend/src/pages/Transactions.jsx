@@ -90,7 +90,7 @@ export default function Transactions() {
                       {t.type === "credit" ? "+" : "-"} ₹ {inr(t.amount)}
                     </td>
                     <td><span className={`pill pill-${t.status}`}>{t.status}</span></td>
-                    <td className="mono text-xs text-muted-foreground">{t.external_txn_id || t.id.slice(0, 12)}</td>
+                    <td className="mono text-xs text-muted-foreground">{t.ref_id || t.external_txn_id || t.id.slice(0, 12)}</td>
                     <td className="mono text-xs text-muted-foreground whitespace-nowrap">{new Date(t.created_at).toLocaleString()}</td>
                   </tr>
                 ))

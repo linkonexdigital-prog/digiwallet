@@ -3,14 +3,15 @@ import { Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
 import { ArrowUpRight, ArrowDownLeft, Clock, Bank, Lightning, Wallet, EyeSlash, Eye } from "@phosphor-icons/react";
 
-const StatCard = ({ label, value, sub, accent, testId, icon: Icon }) => (
-  <div data-testid={testId} className="card-flat p-6 hover-lift">
-    <div className="flex items-start justify-between mb-3">
+const StatCard = ({ label, value, sub, accent, testId, icon: Icon, tint }) => (
+  <div data-testid={testId} className={`card-flat p-6 hover-lift relative overflow-hidden ${tint || ""}`}>
+    {tint && <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-50 ${tint === "tint-success" ? "bg-success/20" : tint === "tint-danger" ? "bg-destructive/15" : "bg-warning/15"}`}/>}
+    <div className="flex items-start justify-between mb-3 relative">
       <div className="overline text-muted-foreground">{label}</div>
       {Icon && <Icon size={16} className="text-muted-foreground" weight="duotone"/>}
     </div>
-    <div className={`mono text-3xl md:text-4xl font-bold tracking-tight ${accent || ""}`}>{value}</div>
-    {sub && <div className="text-xs text-muted-foreground mt-2">{sub}</div>}
+    <div className={`mono text-3xl md:text-4xl font-bold tracking-tight relative ${accent || ""}`}>{value}</div>
+    {sub && <div className="text-xs text-muted-foreground mt-2 relative">{sub}</div>}
   </div>
 );
 
@@ -45,33 +46,40 @@ export default function Dashboard() {
       </div>
 
       {/* Hero balance */}
-      <div className="card-flat p-6 md:p-8 mb-6 relative overflow-hidden bg-card">
-        <div className="absolute -top-32 -right-20 w-96 h-96 rounded-full bg-foreground/[0.04] blur-3xl pointer-events-none"/>
+      <div className="card-flat p-6 md:p-8 mb-6 relative overflow-hidden bg-gradient-to-br from-card via-card to-success/5">
+        <div className="absolute -top-32 -right-20 w-96 h-96 rounded-full bg-success/[0.06] blur-3xl pointer-events-none"/>
+        <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-foreground/[0.04] blur-3xl pointer-events-none"/>
         <div className="flex flex-wrap justify-between items-start gap-6 relative">
           <div className="flex-1">
-            <div className="overline text-muted-foreground mb-3">Available Balance {s?.wallet_frozen && <span className="ml-2 pill pill-rejected">FROZEN</span>}</div>
+            <div className="overline text-muted-foreground mb-3 flex items-center gap-2">
+              <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"/><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success"/></span>
+              Available Balance {s?.wallet_frozen && <span className="ml-2 pill pill-rejected">FROZEN</span>}
+            </div>
             <div className="flex items-baseline gap-3">
               <span className="font-display text-3xl md:text-4xl text-muted-foreground">₹</span>
-              <span data-testid="dashboard-balance" className="mono text-5xl md:text-7xl font-bold tracking-tight">
+              <span data-testid="dashboard-balance" className="mono text-5xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
                 {show ? inr(s?.balance) : "•••••"}
               </span>
-              <button onClick={() => setShow(!show)} className="ml-2 text-muted-foreground hover:text-foreground p-2">
+              <button onClick={() => setShow(!show)} className="ml-2 text-muted-foreground hover:text-foreground p-2 transition">
                 {show ? <EyeSlash size={18}/> : <Eye size={18}/>}
               </button>
             </div>
-            <div className="text-sm text-muted-foreground mt-3">Updated live · {new Date().toLocaleTimeString()}</div>
+            <div className="text-sm text-muted-foreground mt-3 flex items-center gap-2">
+              <Lightning size={14} weight="duotone"/>
+              Live · updated {new Date().toLocaleTimeString()}
+            </div>
           </div>
-          <div className="w-12 h-12 rounded-md bg-foreground text-background flex items-center justify-center">
-            <Wallet size={22} weight="duotone"/>
+          <div className="w-14 h-14 rounded-md bg-gradient-to-br from-foreground to-foreground/70 text-background flex items-center justify-center shadow-lg">
+            <Wallet size={26} weight="duotone"/>
           </div>
         </div>
       </div>
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <StatCard testId="stat-credits" label="Total Credits" value={`₹ ${inr(s?.total_credits)}`} accent="text-success" sub="Lifetime received" icon={ArrowDownLeft}/>
-        <StatCard testId="stat-withdrawals" label="Total Withdrawals" value={`₹ ${inr(s?.total_withdrawals)}`} accent="text-destructive" sub="Paid out" icon={ArrowUpRight}/>
-        <StatCard testId="stat-pending" label="Pending Withdrawals" value={s?.pending_withdrawals_count ?? 0} sub={`₹ ${inr(s?.pending_withdrawals_amount)} in review`} icon={Clock}/>
+        <StatCard testId="stat-credits" label="Total Credits" value={`₹ ${inr(s?.total_credits)}`} accent="text-success" sub="Lifetime received" icon={ArrowDownLeft} tint="tint-success"/>
+        <StatCard testId="stat-withdrawals" label="Total Withdrawals" value={`₹ ${inr(s?.total_withdrawals)}`} accent="text-destructive" sub="Paid out" icon={ArrowUpRight} tint="tint-danger"/>
+        <StatCard testId="stat-pending" label="Pending Withdrawals" value={s?.pending_withdrawals_count ?? 0} sub={`₹ ${inr(s?.pending_withdrawals_amount)} in review`} icon={Clock} tint="tint-warning"/>
       </div>
 
       {/* Recent transactions */}
@@ -97,7 +105,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm truncate">{t.description || t.type}</div>
-                  <div className="mono text-xs text-muted-foreground truncate">{t.external_txn_id || t.id.slice(0, 16)}</div>
+                  <div className="mono text-xs text-muted-foreground truncate">{new Date(t.created_at).toLocaleString()}</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className={`mono font-bold ${t.type === "credit" ? "text-success" : "text-destructive"}`}>

@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useTheme } from "@/lib/ThemeContext";
-import api from "@/lib/api";
+import { useLiveNotifications } from "@/lib/useLiveNotifications";
 import {
   Wallet, House, ArrowsLeftRight, Bank, Bell, Gear, SignOut,
-  Sun, Moon, List, X, ArrowUUpLeft, User as UserIcon
+  Sun, Moon, List, X, ArrowUUpLeft, User as UserIcon, BellRinging
 } from "@phosphor-icons/react";
 
 const navItems = [
@@ -21,22 +21,16 @@ export default function AppLayout({ children }) {
   const { theme, toggle } = useTheme();
   const nav = useNavigate();
   const loc = useLocation();
-  const [unread, setUnread] = useState(0);
+  const { unread, permission, requestPermission } = useLiveNotifications(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem("dw_notif_banner_dismissed") === "1");
   const adminBackup = typeof window !== "undefined" && localStorage.getItem("dw_admin_backup");
 
-  useEffect(() => {
-    let mounted = true;
-    const fetchUnread = async () => {
-      try {
-        const r = await api.get("/notifications", { params: { limit: 1 } });
-        if (mounted) setUnread(r.data.unread);
-      } catch (_) {}
-    };
-    fetchUnread();
-    const i = setInterval(fetchUnread, 15000);
-    return () => { mounted = false; clearInterval(i); };
-  }, [loc.pathname]);
+  const dismissBanner = () => { localStorage.setItem("dw_notif_banner_dismissed", "1"); setBannerDismissed(true); };
+  const enablePush = async () => {
+    const p = await requestPermission();
+    if (p === "granted") dismissBanner();
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -148,6 +142,21 @@ export default function AppLayout({ children }) {
         )}
 
         <main className="flex-1 min-w-0">
+          {permission === "default" && !bannerDismissed && (
+            <div className="px-4 lg:px-6 pt-4">
+              <div className="card-flat px-4 py-3 flex items-center gap-3 bg-gradient-to-r from-success/10 to-transparent border-success/30">
+                <div className="w-10 h-10 rounded-md bg-success/15 text-success flex items-center justify-center shrink-0">
+                  <BellRinging size={20} weight="duotone"/>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold">Enable live alerts</div>
+                  <div className="text-xs text-muted-foreground">Get instant browser notifications for credits, withdrawals and approvals — even when this tab is in background.</div>
+                </div>
+                <button data-testid="enable-push-btn" onClick={enablePush} className="px-3 py-2 rounded-md bg-foreground text-background text-xs font-bold shrink-0 hover-lift">Enable</button>
+                <button onClick={dismissBanner} className="p-2 text-muted-foreground hover:text-foreground"><X size={16}/></button>
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>
