@@ -121,41 +121,24 @@ export default function AdminApi() {
 
 function GatewayUrlPanel({ keys }) {
   const [selectedKey, setSelectedKey] = React.useState("");
-  const [walletParam, setWalletParam] = React.useState("numbe");
-  const [walletPlaceholder, setWalletPlaceholder] = React.useState("{paytm}");
-  const [amountParam, setAmountParam] = React.useState("amount");
-  const [amountPlaceholder, setAmountPlaceholder] = React.useState("{amo}");
-  const [commentParam, setCommentParam] = React.useState("comment");
-  const [commentPlaceholder, setCommentPlaceholder] = React.useState("{com}");
-  const [withOrder, setWithOrder] = React.useState(false);
-  const [orderParam, setOrderParam] = React.useState("order_id");
-  const [orderPlaceholder, setOrderPlaceholder] = React.useState("{order_id}");
   const [copied, setCopied] = React.useState(false);
-
   React.useEffect(() => {
     if (keys?.length && !selectedKey) setSelectedKey(keys[0].key);
   }, [keys]);
 
   const base = `${process.env.REACT_APP_BACKEND_URL}/api`;
   const k = selectedKey || "YOUR_API_KEY";
-
-  let url = `${base}/add_balance.php?key=${k}&${walletParam}=${walletPlaceholder}&${amountParam}=${amountPlaceholder}&${commentParam}=${commentPlaceholder}`;
-  if (withOrder) url += `&${orderParam}=${orderPlaceholder}`;
+  const url = `${base}/add_balance.php?key=${k}&walletnumber={replace}&amount={replace}&comment={replace}&order_id={replace}`;
 
   const copy = () => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); };
-
-  const WALLET_ALIASES = ["numbe", "paytm", "wallet_number", "wallet_no", "wallet", "wallet_id", "digiwallet", "digi_wallet", "user", "user_id", "userid", "username", "mobile", "mobile_number", "number", "phone", "account", "acc", "account_no", "to", "receiver", "beneficiary", "customer", "customer_id"];
-  const AMOUNT_ALIASES = ["amount", "amo", "amt", "value", "sum", "rs"];
-  const COMMENT_ALIASES = ["comment", "com", "note", "description", "desc", "remark", "remarks", "msg", "message"];
-  const ORDER_ALIASES = ["order_id", "orderid", "order", "txnid", "txn_id", "transaction_id", "ref", "reference", "ref_id", "utr"];
 
   return (
     <div className="card-flat p-6 mb-6">
       <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
         <div>
-          <div className="overline text-muted-foreground mb-1">Gateway URL Builder</div>
+          <div className="overline text-muted-foreground mb-1">Gateway URL</div>
           <h3 className="font-display text-lg font-bold">External integration endpoint</h3>
-          <p className="text-xs text-muted-foreground mt-1">One single endpoint — <span className="mono">/api/add_balance.php</span> — accepts <strong>any common parameter name</strong> for wallet, amount, comment. Customize the param names below to match your upstream gateway, then copy the URL.</p>
+          <p className="text-sm text-muted-foreground mt-1">Copy the URL below. Replace each <code className="mono px-1.5 py-0.5 bg-surface rounded border border-border">{"{replace}"}</code> with your upstream gateway's placeholder. Rename the param keys if needed — the same endpoint accepts many common aliases.</p>
         </div>
         {keys?.length > 0 && (
           <select value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)} className="px-3 py-2 bg-surface border border-border rounded-md text-sm mono max-w-[260px]">
@@ -164,61 +147,48 @@ function GatewayUrlPanel({ keys }) {
         )}
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4 mb-4">
-        <ParamRow label="Wallet / User" testId="wallet" pVal={walletParam} setP={setWalletParam} hVal={walletPlaceholder} setH={setWalletPlaceholder} aliases={WALLET_ALIASES}/>
-        <ParamRow label="Amount" testId="amount" pVal={amountParam} setP={setAmountParam} hVal={amountPlaceholder} setH={setAmountPlaceholder} aliases={AMOUNT_ALIASES}/>
-        <ParamRow label="Comment" testId="comment" pVal={commentParam} setP={setCommentParam} hVal={commentPlaceholder} setH={setCommentPlaceholder} aliases={COMMENT_ALIASES}/>
-      </div>
-
-      <div className="card-flat p-3 mb-4 bg-surface">
-        <label className="flex items-center gap-2 text-sm cursor-pointer mb-2">
-          <input data-testid="gw-order-toggle" type="checkbox" checked={withOrder} onChange={(e) => setWithOrder(e.target.checked)}/>
-          <span className="font-semibold">Include order_id parameter</span>
-          <span className="text-xs text-muted-foreground">(recommended for stronger duplicate detection)</span>
-        </label>
-        {withOrder && (
-          <div className="grid md:grid-cols-1 gap-3">
-            <ParamRow label="Order ID" testId="order" pVal={orderParam} setP={setOrderParam} hVal={orderPlaceholder} setH={setOrderPlaceholder} aliases={ORDER_ALIASES}/>
-          </div>
-        )}
-      </div>
-
-      <div className="border border-border rounded-md overflow-hidden">
+      <div className="border border-border rounded-md overflow-hidden mb-4">
         <div className="px-4 py-2.5 bg-surface flex justify-between items-center gap-3">
-          <div className="text-sm font-semibold">Your gateway URL</div>
+          <div className="text-sm font-semibold">Gateway URL Template</div>
           <button onClick={copy} data-testid="gw-copy-url" className="px-3 py-1.5 rounded-md bg-foreground text-background text-xs font-semibold inline-flex items-center gap-1.5 shrink-0">
             {copied ? <><Check size={12}/> Copied</> : <><Copy size={12}/> Copy</>}
           </button>
         </div>
-        <div className="px-4 py-3 mono text-xs break-all">{url}</div>
+        <div className="px-4 py-3 mono text-xs break-all leading-relaxed">{url}</div>
       </div>
 
-      <div className="mt-4 p-4 rounded-md bg-surface border border-border text-xs text-muted-foreground">
-        <strong className="text-foreground">Tip:</strong> The same backend endpoint accepts any of these aliases automatically — you don't need to configure anything server-side. Use whichever param name your upstream gateway expects.
-        <div className="mt-2">
-          <strong>Response:</strong> plain text <span className="mono">SUCCESS: ...</span> / <span className="mono">ERROR: ...</span>. Append <span className="mono">&format=json</span> for JSON.
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="p-4 rounded-md bg-surface border border-border">
+          <div className="overline text-muted-foreground mb-2">Required parameters</div>
+          <div className="space-y-1.5 text-xs">
+            <div><span className="mono font-semibold text-foreground">key</span> · <span className="text-muted-foreground">your API key (already filled in URL)</span></div>
+            <div><span className="mono font-semibold text-foreground">walletnumber</span> · <span className="text-muted-foreground">user's wallet / mobile number</span></div>
+            <div><span className="mono font-semibold text-foreground">amount</span> · <span className="text-muted-foreground">credit amount</span></div>
+            <div><span className="mono font-semibold text-foreground">comment</span> · <span className="text-muted-foreground">description / reference text</span></div>
+            <div className="pt-1.5 mt-1.5 border-t border-border"><span className="mono font-semibold text-warning">order_id</span> · <span className="text-muted-foreground"><strong className="text-foreground">Optional</strong> — for duplicate detection. Remove from URL if your gateway does not provide it.</span></div>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-md bg-surface border border-border">
+          <div className="overline text-muted-foreground mb-2">Param can be renamed to any of these</div>
+          <div className="space-y-1.5 text-xs leading-relaxed">
+            <div><span className="mono font-semibold text-foreground">walletnumber</span> → <span className="mono text-muted-foreground">numbe, paytm, wallet_number, mobile, user_id, digiwallet, number, phone, account, ...</span></div>
+            <div><span className="mono font-semibold text-foreground">amount</span> → <span className="mono text-muted-foreground">amo, amt, value, sum</span></div>
+            <div><span className="mono font-semibold text-foreground">comment</span> → <span className="mono text-muted-foreground">com, note, description, remark, msg, message</span></div>
+            <div><span className="mono font-semibold text-foreground">order_id</span> → <span className="mono text-muted-foreground">orderid, txnid, txn_id, ref, reference, utr</span></div>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function ParamRow({ label, testId, pVal, setP, hVal, setH, aliases }) {
-  return (
-    <div className="border border-border rounded-md p-3 bg-surface">
-      <div className="overline text-muted-foreground mb-2">{label}</div>
-      <div className="space-y-2">
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">Param name</div>
-          <input data-testid={`gw-${testId}-param`} list={`gw-${testId}-aliases`} value={pVal} onChange={(e) => setP(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))} className="w-full px-2.5 py-2 bg-background border border-border rounded-md mono text-sm"/>
-          <datalist id={`gw-${testId}-aliases`}>
-            {aliases.map((a) => <option key={a} value={a}/>)}
-          </datalist>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">Gateway placeholder</div>
-          <input data-testid={`gw-${testId}-placeholder`} value={hVal} onChange={(e) => setH(e.target.value)} className="w-full px-2.5 py-2 bg-background border border-border rounded-md mono text-sm"/>
-        </div>
+      <div className="mt-4 p-4 rounded-md bg-warning/5 border border-warning/30 text-xs text-muted-foreground">
+        <strong className="text-foreground">Example for different gateways:</strong>
+        <div className="mt-2 mono break-all">…/add_balance.php?key=…&<strong className="text-foreground">paytm</strong>={"{wallet_number}"}&<strong className="text-foreground">amount</strong>={"{amount}"}&<strong className="text-foreground">comment</strong>={"{comment}"}</div>
+        <div className="mt-2 mono break-all">…/add_balance.php?key=…&<strong className="text-foreground">mobile</strong>={"{mobile_no}"}&<strong className="text-foreground">amt</strong>={"{amt}"}&<strong className="text-foreground">remark</strong>={"{note}"}</div>
+        <div className="mt-2">Both URLs hit the <strong>same backend</strong> — just rename the param key to match what your gateway expects, then replace the <span className="mono">{"{...}"}</span> with the gateway's placeholder syntax.</div>
+      </div>
+
+      <div className="mt-3 text-xs text-muted-foreground">
+        <strong>Response:</strong> plain text <span className="mono">SUCCESS: ...</span> / <span className="mono">ERROR: ...</span> — append <span className="mono">&format=json</span> for JSON output.
       </div>
     </div>
   );

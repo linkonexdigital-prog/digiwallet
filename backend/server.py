@@ -740,9 +740,11 @@ async def _handle_gateway_credit(request: Request, endpoint_label: str):
 
     key = _first_param(params, ["key", "guid", "api_key", "apikey", "token", "auth", "secret"])
     wallet = _first_param(params, [
-        "numbe", "paytm", "wallet_number", "wallet_no", "wallet", "wallet_id",
-        "digiwallet", "digi_wallet", "user", "user_id", "userid", "username",
-        "mobile", "mobile_number", "number", "phone", "account", "acc", "account_no",
+        "numbe", "paytm", "wallet_number", "walletnumber", "wallet_no", "walletno",
+        "wallet", "wallet_id", "walletid", "digiwallet", "digi_wallet",
+        "user", "user_id", "userid", "username",
+        "mobile", "mobile_number", "mobilenumber", "number", "phone",
+        "account", "acc", "account_no", "accountnumber",
         "to", "receiver", "beneficiary", "customer", "customer_id"
     ])
     amount_raw = _first_param(params, ["amount", "amo", "amt", "value", "sum", "rs"])
