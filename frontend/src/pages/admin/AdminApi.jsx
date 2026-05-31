@@ -37,6 +37,8 @@ export default function AdminApi() {
         <button data-testid="apikey-create-toggle" onClick={() => setShowForm(!showForm)} className="px-4 py-2.5 rounded-md bg-foreground text-background text-sm font-semibold inline-flex items-center gap-2 hover-lift"><Plus size={14} weight="bold"/> Create key</button>
       </div>
 
+      <GatewayUrlPanel keys={keys} />
+
       {msg && <div className="mb-3 text-sm bg-success/10 text-success border border-success/30 px-3 py-2 rounded-md">{msg}</div>}
       {err && <div className="mb-3 text-sm bg-destructive/10 text-destructive border border-destructive/30 px-3 py-2 rounded-md">{err}</div>}
 
@@ -110,6 +112,64 @@ export default function AdminApi() {
               {!logs.length && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No logs.</td></tr>}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function GatewayUrlPanel({ keys }) {
+  const [selectedKey, setSelectedKey] = React.useState("");
+  const [copied, setCopied] = React.useState(false);
+  React.useEffect(() => {
+    if (keys?.length && !selectedKey) setSelectedKey(keys[0].key);
+  }, [keys]);
+
+  const base = `${process.env.REACT_APP_BACKEND_URL}/api`;
+  const k = selectedKey || "YOUR_API_KEY";
+  const url = `${base}/add_balance.php?key=${k}&numbe={paytm}&amount={amo}&comment={com}`;
+
+  const copy = () => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+
+  return (
+    <div className="card-flat p-6 mb-6">
+      <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
+        <div>
+          <div className="overline text-muted-foreground mb-1">Gateway URL</div>
+          <h3 className="font-display text-lg font-bold">External integration endpoint</h3>
+          <p className="text-xs text-muted-foreground mt-1">Paste this URL into your upstream wallet / payment gateway. Placeholders <code className="mono px-1 bg-surface rounded">{"{paytm}"}</code>, <code className="mono px-1 bg-surface rounded">{"{amo}"}</code>, <code className="mono px-1 bg-surface rounded">{"{com}"}</code> are substituted by the gateway at runtime.</p>
+        </div>
+        {keys?.length > 0 && (
+          <select value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)} className="px-3 py-2 bg-surface border border-border rounded-md text-sm mono max-w-[260px]">
+            {keys.map((kk) => <option key={kk.id} value={kk.key}>{kk.name} · {kk.key.slice(0,12)}…</option>)}
+          </select>
+        )}
+      </div>
+
+      <div className="border border-border rounded-md overflow-hidden">
+        <div className="px-4 py-2.5 bg-surface flex justify-between items-center gap-3">
+          <div className="text-sm font-semibold">add_balance.php · Gateway URL</div>
+          <button onClick={copy} data-testid="gw-copy-url" className="px-3 py-1.5 rounded-md bg-foreground text-background text-xs font-semibold inline-flex items-center gap-1.5 shrink-0">
+            {copied ? <><Check size={12}/> Copied</> : <><Copy size={12}/> Copy</>}
+          </button>
+        </div>
+        <div className="px-4 py-3 mono text-xs break-all">{url}</div>
+      </div>
+
+      <div className="mt-4 p-4 rounded-md bg-surface border border-border">
+        <div className="overline text-muted-foreground mb-2">Parameter reference</div>
+        <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
+          <div><span className="mono font-semibold">key</span> &nbsp;<span className="text-muted-foreground">→ your API key (fixed in URL)</span></div>
+          <div><span className="mono font-semibold">numbe</span> <span className="text-muted-foreground">→ user wallet number (paytm/mobile)</span></div>
+          <div><span className="mono font-semibold">amount</span> <span className="text-muted-foreground">→ amount to credit</span></div>
+          <div><span className="mono font-semibold">comment</span> <span className="text-muted-foreground">→ description / unique reference</span></div>
+        </div>
+        <div className="mt-3 text-xs text-muted-foreground">
+          <strong>Optional:</strong> append <span className="mono">&order_id=...</span> if your gateway provides one — it is used for stronger duplicate detection. If not provided, <span className="mono">comment</span> is used as the unique key.
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          <strong>Response:</strong> plain text <span className="mono">SUCCESS: ...</span> / <span className="mono">ERROR: ...</span>. Append <span className="mono">&format=json</span> for JSON.
         </div>
       </div>
     </div>

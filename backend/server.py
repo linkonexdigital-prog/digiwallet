@@ -698,6 +698,175 @@ async def credit_api(body: CreditApiReq, request: Request):
     return {"success": True, "txn_id": tx["id"], "external_txn_id": body.txn_id, "new_balance": user.get("balance", 0) + body.amount}
 
 # ==========================================================
+# GATEWAY COMPATIBILITY ENDPOINT
+# Supports both formats:
+#   Format A (legacy add_balance.php):
+#     GET /api/add_balance.php?key=XXX&numbe={paytm}&amount={amo}&comment={com}&order_id={order_id}
+#   Format B (modern gateway):
+#     GET /api/gateway?guid=XXX&paytm={wallet_number}&amount={amount}&comment={comment}&order_id={order_id}
+#
+# All param names are case-insensitive and accept aliases:
+#   API key       : key | guid | api_key | apikey | token
+#   Wallet/User   : numbe | paytm | wallet_number | wallet_no | wallet | mobile | mobile_number | number
+#   Amount        : amount | amo | amt
+#   Comment       : comment | com | note | description | desc
+#   Order ID      : order_id | orderid | order | txnid | txn_id | transaction_id
+# Output format  : ?format=text (default) or ?format=json
+# ==========================================================
+def _first_param(params: dict, names: list, default=None):
+    for n in names:
+        for k, v in params.items():
+            if k.lower() == n.lower() and v not in (None, ""):
+                return v
+    return default
+
+async def _handle_gateway_credit(request: Request, endpoint_label: str):
+    params = dict(request.query_params)
+    # Also merge POST form/json if present
+    if request.method == "POST":
+        try:
+            ctype = request.headers.get("content-type", "")
+            if "application/json" in ctype:
+                body = await request.json()
+                if isinstance(body, dict):
+                    for k, v in body.items():
+                        params.setdefault(k, str(v))
+            else:
+                form = await request.form()
+                for k, v in form.items():
+                    params.setdefault(k, str(v))
+        except Exception:
+            pass
+
+    key = _first_param(params, ["key", "guid", "api_key", "apikey", "token"])
+    wallet = _first_param(params, ["numbe", "paytm", "wallet_number", "wallet_no", "wallet", "mobile", "mobile_number", "number"])
+    amount_raw = _first_param(params, ["amount", "amo", "amt"])
+    comment = _first_param(params, ["comment", "com", "note", "description", "desc"], "")
+    order_id = _first_param(params, ["order_id", "orderid", "order", "txnid", "txn_id", "transaction_id"], "")
+    out_format = (_first_param(params, ["format"], "text") or "text").lower()
+
+    ip = request.client.host if request.client else "unknown"
+    log_doc = {
+        "id": gen_id(),
+        "endpoint": endpoint_label,
+        "request": {
+            "key": (key[:8] + "...") if key else None,
+            "wallet": wallet, "amount": amount_raw,
+            "comment": comment, "order_id": order_id,
+        },
+        "ip": ip,
+        "status": "pending",
+        "error": None,
+        "created_at": iso(now_utc()),
+    }
+
+    def respond(ok: bool, msg: str, http: int = 200, extra: Optional[dict] = None):
+        if out_format == "json":
+            import json as _json
+            payload = {"status": "SUCCESS" if ok else "ERROR", "message": msg}
+            if extra: payload.update(extra)
+            return Response(content=_json.dumps(payload), media_type="application/json", status_code=http)
+        body = f"SUCCESS: {msg}" if ok else f"ERROR: {msg}"
+        return Response(content=body, media_type="text/plain", status_code=http)
+
+    if not key:
+        log_doc["status"] = "failed"; log_doc["error"] = "Missing API key"; log_doc["error_type"] = "missing_key"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, "Missing API key (key/guid)", 400)
+    if not wallet:
+        log_doc["status"] = "failed"; log_doc["error"] = "Missing wallet number"; log_doc["error_type"] = "missing_wallet"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, "Missing wallet number (paytm/numbe/wallet_number)", 400)
+
+    # Parse amount
+    try:
+        amt = float(amount_raw)
+        if amt <= 0: raise ValueError
+    except Exception:
+        log_doc["status"] = "failed"; log_doc["error"] = "Invalid amount"; log_doc["error_type"] = "invalid_amount"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, "Invalid amount", 400)
+
+    # Validate API key
+    api_key = await db.api_keys.find_one({"key": key})
+    if not api_key:
+        log_doc["status"] = "failed"; log_doc["error"] = "Invalid API key"; log_doc["error_type"] = "invalid_key"
+        await db.api_logs.insert_one(log_doc)
+        await telegram_send(f"<b>API INVALID_KEY</b>\nEndpoint: {endpoint_label}\nIP: {ip}\nKey: {key[:8]}...")
+        return respond(False, "Invalid API key", 401)
+    if api_key["status"] != "active":
+        log_doc["status"] = "failed"; log_doc["error"] = "API key paused"; log_doc["error_type"] = "paused_key"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, "API key is paused", 403)
+    if api_key.get("ip_whitelist") and ip not in api_key["ip_whitelist"]:
+        log_doc["status"] = "failed"; log_doc["error"] = f"IP {ip} not whitelisted"; log_doc["error_type"] = "ip_blocked"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, "IP not whitelisted", 403)
+    log_doc["api_key_id"] = api_key["id"]
+
+    # Resolve user by mobile/wallet number
+    wallet = str(wallet).strip()
+    user = await db.users.find_one({"mobile_number": wallet})
+    if not user:
+        log_doc["status"] = "failed"; log_doc["error"] = f"Wallet {wallet} not found"; log_doc["error_type"] = "user_not_found"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, f"Wallet {wallet} not found", 404)
+    if user.get("status") == "banned":
+        log_doc["status"] = "failed"; log_doc["error"] = "User banned"; log_doc["error_type"] = "user_banned"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, "User is banned", 403)
+    if user.get("wallet_frozen"):
+        log_doc["status"] = "failed"; log_doc["error"] = "Wallet frozen"; log_doc["error_type"] = "wallet_frozen"
+        await db.api_logs.insert_one(log_doc)
+        return respond(False, "Wallet is frozen", 403)
+
+    # Duplicate detection: prefer order_id, else fallback to comment
+    dup_key = (str(order_id) or str(comment) or "").strip()
+    if dup_key:
+        dup = await db.transactions.find_one({"external_txn_id": dup_key, "api_key_id": api_key["id"]})
+        if dup:
+            log_doc["status"] = "duplicate"; log_doc["error"] = "Duplicate order_id"; log_doc["error_type"] = "duplicate"
+            await db.api_logs.insert_one(log_doc)
+            return respond(False, "Duplicate transaction", 409, {"order_id": dup_key})
+
+    # Credit wallet
+    await db.users.update_one({"id": user["id"]}, {"$inc": {"balance": amt}})
+    tx = {
+        "id": gen_id(),
+        "user_id": user["id"],
+        "type": "credit",
+        "amount": amt,
+        "status": "completed",
+        "description": comment or "Gateway credit",
+        "external_txn_id": dup_key or None,
+        "order_id": dup_key or None,
+        "api_key_id": api_key["id"],
+        "gateway_endpoint": endpoint_label,
+        "created_at": iso(now_utc()),
+    }
+    await db.transactions.insert_one(tx)
+    await db.api_keys.update_one({"id": api_key["id"]}, {"$inc": {"requests_today": 1}, "$set": {"last_used_at": iso(now_utc())}})
+    log_doc["status"] = "success"; log_doc["txn_id"] = tx["id"]
+    await db.api_logs.insert_one(log_doc)
+
+    new_bal = user.get("balance", 0) + amt
+    await push_notification(user["id"], "Money Credited", f"₹{amt} credited to your wallet. {comment or ''}".strip(), "success")
+    await telegram_send(f"<b>New Credit</b>\nEndpoint: {endpoint_label}\nUser: {user['full_name']} ({wallet})\nAmount: ₹{amt}\nOrder: {dup_key or '—'}")
+
+    return respond(True, f"Credited {amt} to {wallet}", 200, {
+        "txn_id": tx["id"], "order_id": dup_key, "new_balance": new_bal, "user_id": user["id"]
+    })
+
+
+# Single gateway endpoint matching the exact reference format:
+# https://your-domain/api/add_balance.php?key=XXX&numbe={paytm}&amount={amo}&comment={com}
+@api.get("/add_balance.php")
+@api.post("/add_balance.php")
+async def gateway_add_balance(request: Request):
+    return await _handle_gateway_credit(request, "/api/add_balance.php")
+
+
+# ==========================================================
 # ADMIN ROUTES
 # ==========================================================
 admin_router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
