@@ -1,0 +1,46 @@
+{
+  "summary": "Comprehensive backend testing of DigiWallet V2 API. 43/43 pytest tests passed covering auth (register/login/me/change-password/brute-force lockout), wallet summary, transactions, external /api/credit (invalid/paused/duplicate/success), payment methods (UPI), withdrawals (create/list/insufficient), notifications, and all admin endpoints (dashboard, users CRUD, login-as, force-logout, wallet credit/debit/adjust/freeze/reverse, withdrawals approve/reject/paid/bulk/export, api-keys CRUD + toggle, api-logs, broadcast, security logs/sessions, settings, telegram test, 403 for non-admin).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/dashboard", "issue": "today_activity & api_requests_today use `{'$gte': today}` where today is a date ISO string (YYYY-MM-DD) but created_at is full ISO datetime string (YYYY-MM-DDTHH:MM:SS+00:00). String comparison still works as a prefix-lex compare so it functions correctly today, but is fragile if timezones/formats change."},
+      {"endpoint": "/api/admin/users/{id}", "issue": "When passing a non-existent user_id PATCH /api/admin/users/{id} silently returns 200 even though update_one matched nothing (no 404)."},
+      {"endpoint": "/api/admin/wallet/credit|debit|adjust", "issue": "Pydantic AdminCreditReq/AdminDebitReq use Field(gt=0); negative/zero returns 422 (not the 400 some clients may expect). Cosmetic only."},
+      {"endpoint": "/api/admin/withdrawals/bulk", "issue": "Accepts empty ids array and returns 200 with processed=[]; no validation that ids is non-empty."},
+      {"endpoint": "/api/credit", "issue": "Returns new_balance computed from in-memory user.get('balance')+amount rather than re-reading after $inc; safe today (sequential awaited update) but should be re-fetched to be 100% accurate under race conditions."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) PATCH /api/admin/users/{id} should return 404 when user_id does not exist (currently 200).",
+    "(Optional) Validate non-empty ids in /api/admin/withdrawals/bulk.",
+    "(Optional) Recompute today's range using ISO datetime instead of date string in dashboard aggregations for robustness."
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~1042 lines and mixes routes, schemas, helpers, startup, and aggregation logic in a single file. Recommend splitting into modules (auth.py, wallet.py, admin.py, schemas.py, db.py) once features stabilize.",
+    "JWT_SECRET is committed in /app/backend/.env. For production this must be moved to a real secret manager. Acceptable for dev.",
+    "ACCESS_TTL_MIN = 60*24 (1 day). Consider shorter-lived access tokens + refresh flow; /auth/login already mentions REFRESH_TTL_DAYS but no refresh route is implemented.",
+    "/api/credit logs the api_key (full body.model_dump()) into db.api_logs. Sensitive keys should be masked before storage (currently telegram_send masks to 8 chars but log keeps full key).",
+    "Brute-force lockout key is `ip:mobile`; an attacker rotating IPs (or behind NAT impacting many users) can bypass. Consider also per-mobile lockout independent of IP.",
+    "settings.smtp_password is masked on GET but never validated on PATCH; any unauthenticated XSS-like leak of settings panel could expose this. Should be write-only.",
+    "Cookies set with samesite='lax' and not 'secure=True' — should be secure when behind HTTPS (which it is in preview)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (43/43)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "Admin: 9999999999 / Admin@123 (verified). Test users created dynamically with TEST_ prefix.",
+  "seed_data_creation": "Tests create temporary users (random mobile starting with 7), one UPI payment method, several credit/debit/adjust transactions, and one withdrawal (approved+paid). Data is left in DB but prefixed/identifiable; not affecting seeded admin.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All backend endpoints listed in review_request are passing. Frontend testing was NOT requested in this iteration. The default API key is fetched via GET /api/admin/api-keys[0].key. Brute-force lockout uses ip:mobile composite. Reject of withdrawal correctly refunds balance (verified). Test file at /app/backend/tests/backend_test.py is a full regression suite ready for reuse.",
+  "rca of the issue": "Only one test initially failed (test_register_password_mismatch returned 422 instead of 400). RCA: the test payload used full_name='X' (1 char) which fails Pydantic min_length=2 validation BEFORE reaching the password-mismatch check. Fixed by using a valid full_name. No backend code change required."
+}
