@@ -93,6 +93,11 @@ def gen_api_key() -> str:
 def gen_id() -> str:
     return uuid.uuid4().hex
 
+def fmt_when(dt: Optional[datetime] = None) -> str:
+    """Short, human-friendly local time stamp for notifications."""
+    d = dt or now_utc()
+    return d.strftime("%b %d, %I:%M %p")
+
 def gen_ref_id() -> str:
     """Generate user-friendly reference like digiwallet280785055101"""
     return "digiwallet" + str(secrets.randbelow(900000000000) + 100000000000)
@@ -735,7 +740,7 @@ async def submit_withdrawal(body: WithdrawalReq, user: dict = Depends(require_ac
         "created_at": iso(now_utc()),
     }
     await db.transactions.insert_one(tx)
-    await push_notification(user["id"], "Withdrawal Submitted", f"Your withdrawal of ₹{body.amount} is pending review.", "info")
+    await push_notification(user["id"], "Withdrawal Submitted", f"₹{body.amount} via {pm['type'].upper()} · {fmt_when()}", "info")
     await telegram_send(
         f"<b>📤 Withdrawal Submitted</b>\nAmount: <b>₹{body.amount}</b>\nMethod: {pm['type'].upper()}\nRef: {tx['ref_id']}\nStatus: Pending review",
         user_chat=user.get("telegram_chat_id"),
@@ -1034,7 +1039,7 @@ async def _handle_gateway_credit(request: Request, endpoint_label: str):
     await db.api_logs.insert_one(log_doc)
 
     new_bal = user.get("balance", 0) + amt
-    await push_notification(user["id"], "Money Credited", f"₹{amt} credited to your wallet. Ref: {tx['ref_id']}", "success")
+    await push_notification(user["id"], "Money Credited", f"₹{amt} · {(comment or 'Gateway credit')[:60]} · {fmt_when()}", "success")
     await telegram_send(
         f"<b>💰 Money Credited!</b>\nAmount: <b>₹{amt}</b>\nRef: <code>{tx['ref_id']}</code>\nComment: {comment or '—'}",
         user_chat=user.get("telegram_chat_id"),
@@ -1164,7 +1169,7 @@ async def admin_wallet_credit(body: AdminCreditReq, admin: dict = Depends(requir
           "status": "completed", "description": f"Manual credit by admin. {body.note or ''}".strip(),
           "admin_id": admin["id"], "created_at": iso(now_utc())}
     await db.transactions.insert_one(tx)
-    await push_notification(body.user_id, "Manual Credit", f"₹{body.amount} credited to your wallet. Ref: {tx['ref_id']}", "success")
+    await push_notification(body.user_id, "Manual Credit", f"₹{body.amount} · {(body.note or 'Manual credit by admin')[:60]} · {fmt_when()}", "success")
     await telegram_send(
         f"<b>💰 Manual Credit</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>\nBy admin",
         user_chat=user.get("telegram_chat_id"),
@@ -1183,7 +1188,7 @@ async def admin_wallet_debit(body: AdminDebitReq, admin: dict = Depends(require_
           "status": "completed", "description": f"Manual debit by admin. {body.note or ''}".strip(),
           "admin_id": admin["id"], "created_at": iso(now_utc())}
     await db.transactions.insert_one(tx)
-    await push_notification(body.user_id, "Manual Debit", f"₹{body.amount} debited from your wallet. Ref: {tx['ref_id']}", "warning")
+    await push_notification(body.user_id, "Manual Debit", f"₹{body.amount} · {(body.note or 'Manual debit by admin')[:60]} · {fmt_when()}", "warning")
     await telegram_send(
         f"<b>📤 Manual Debit</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>",
         user_chat=user.get("telegram_chat_id"),
@@ -1272,7 +1277,7 @@ async def _process_wd(wid: str, action: str, note: str, admin_id: str):
     user_doc = await db.users.find_one({"id": wd["user_id"]})
     if new_status in title_map:
         await push_notification(wd["user_id"], title_map[new_status],
-                                f"Your withdrawal of ₹{wd['amount']} has been {new_status}.", nt_map[new_status])
+                                f"₹{wd['amount']} via {wd.get('method','').upper()}{(' · ' + note) if note else ''} · {fmt_when()}", nt_map[new_status])
     await telegram_send(
         f"<b>{emoji_map.get(new_status, '')} Withdrawal {new_status.upper()}</b>\nAmount: <b>₹{wd['amount']}</b>\nMethod: {wd.get('method', '').upper()}",
         user_chat=(user_doc or {}).get("telegram_chat_id"),
