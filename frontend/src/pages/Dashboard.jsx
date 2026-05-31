@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { inr } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { ArrowUpRight, ArrowDownLeft, Clock, Lightning, Wallet, EyeSlash, Eye, Bank, Plus, ShieldCheck, BellRinging, Sparkle, CreditCard } from "@phosphor-icons/react";
+import { ArrowUpRight, ArrowDownLeft, Clock, Lightning, Wallet, EyeSlash, Eye, Sparkle } from "@phosphor-icons/react";
 
 const StatCard = ({ label, value, sub, accent, testId, icon: Icon, tint }) => (
   <div data-testid={testId} className="card-flat p-5 hover-lift relative overflow-hidden group">
@@ -14,19 +14,6 @@ const StatCard = ({ label, value, sub, accent, testId, icon: Icon, tint }) => (
     <div className={`mono text-3xl md:text-4xl font-bold tracking-tight relative ${accent || ""}`}>{value}</div>
     {sub && <div className="text-xs text-muted-foreground mt-2 relative">{sub}</div>}
   </div>
-);
-
-const QuickAction = ({ to, label, icon: Icon, sub, testId }) => (
-  <Link to={to} data-testid={testId} className="card-flat p-4 hover-lift group flex items-center gap-3 hover:border-brand/50 transition">
-    <div className="w-11 h-11 rounded-md bg-brand/10 text-brand flex items-center justify-center group-hover:bg-brand group-hover:text-brand-foreground transition">
-      <Icon size={20} weight="duotone"/>
-    </div>
-    <div className="flex-1 min-w-0">
-      <div className="text-sm font-semibold">{label}</div>
-      <div className="text-xs text-muted-foreground">{sub}</div>
-    </div>
-    <ArrowUpRight size={14} className="text-muted-foreground group-hover:text-foreground rotate-45 group-hover:rotate-0 transition"/>
-  </Link>
 );
 
 const greeting = () => {
@@ -105,13 +92,6 @@ export default function Dashboard() {
             <Wallet size={28} weight="duotone"/>
           </div>
         </div>
-      </div>
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <QuickAction testId="qa-withdraw" to="/app/withdrawals" label="Withdraw funds" sub="UPI or Bank transfer" icon={Bank}/>
-        <QuickAction testId="qa-transactions" to="/app/transactions" label="View transactions" sub="Search & filter history" icon={CreditCard}/>
-        <QuickAction testId="qa-settings" to="/app/settings" label="Alerts & security" sub="Push + Telegram + password" icon={ShieldCheck}/>
       </div>
 
       {/* KPI Grid */}

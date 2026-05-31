@@ -740,7 +740,7 @@ async def submit_withdrawal(body: WithdrawalReq, user: dict = Depends(require_ac
         "created_at": iso(now_utc()),
     }
     await db.transactions.insert_one(tx)
-    await push_notification(user["id"], "Withdrawal Submitted", f"₹{body.amount} via {pm['type'].upper()} · {fmt_when()}", "info")
+    await push_notification(user["id"], "Withdrawal Submitted", f"₹{body.amount} · withdrawal requested via {pm['type'].upper()} · {fmt_when()}", "info")
     await telegram_send(
         f"<b>📤 Withdrawal Submitted</b>\nAmount: <b>₹{body.amount}</b>\nMethod: {pm['type'].upper()}\nRef: {tx['ref_id']}\nStatus: Pending review",
         user_chat=user.get("telegram_chat_id"),
@@ -870,7 +870,7 @@ async def credit_api(body: CreditApiReq, request: Request):
     log_doc["txn_id"] = tx["id"]
     await db.api_logs.insert_one(log_doc)
 
-    await push_notification(body.user_id, "Money Credited", f"₹{body.amount} credited to your wallet. Ref: {tx['ref_id']}", "success")
+    await push_notification(body.user_id, "Money Credited", f"₹{body.amount} · credited for {(body.description or body.txn_id)[:60]} · {fmt_when()}", "success")
     await telegram_send(
         f"<b>💰 Money Credited!</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>\nTXN: {body.txn_id}",
         user_chat=user.get("telegram_chat_id"),
@@ -1039,7 +1039,7 @@ async def _handle_gateway_credit(request: Request, endpoint_label: str):
     await db.api_logs.insert_one(log_doc)
 
     new_bal = user.get("balance", 0) + amt
-    await push_notification(user["id"], "Money Credited", f"₹{amt} · {(comment or 'Gateway credit')[:60]} · {fmt_when()}", "success")
+    await push_notification(user["id"], "Money Credited", f"₹{amt} · credited for {(comment or 'Gateway credit')[:60]} · {fmt_when()}", "success")
     await telegram_send(
         f"<b>💰 Money Credited!</b>\nAmount: <b>₹{amt}</b>\nRef: <code>{tx['ref_id']}</code>\nComment: {comment or '—'}",
         user_chat=user.get("telegram_chat_id"),
@@ -1169,7 +1169,7 @@ async def admin_wallet_credit(body: AdminCreditReq, admin: dict = Depends(requir
           "status": "completed", "description": f"Manual credit by admin. {body.note or ''}".strip(),
           "admin_id": admin["id"], "created_at": iso(now_utc())}
     await db.transactions.insert_one(tx)
-    await push_notification(body.user_id, "Manual Credit", f"₹{body.amount} · {(body.note or 'Manual credit by admin')[:60]} · {fmt_when()}", "success")
+    await push_notification(body.user_id, "Manual Credit", f"₹{body.amount} · credited for {(body.note or 'Manual credit by admin')[:60]} · {fmt_when()}", "success")
     await telegram_send(
         f"<b>💰 Manual Credit</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>\nBy admin",
         user_chat=user.get("telegram_chat_id"),
@@ -1188,7 +1188,7 @@ async def admin_wallet_debit(body: AdminDebitReq, admin: dict = Depends(require_
           "status": "completed", "description": f"Manual debit by admin. {body.note or ''}".strip(),
           "admin_id": admin["id"], "created_at": iso(now_utc())}
     await db.transactions.insert_one(tx)
-    await push_notification(body.user_id, "Manual Debit", f"₹{body.amount} · {(body.note or 'Manual debit by admin')[:60]} · {fmt_when()}", "warning")
+    await push_notification(body.user_id, "Manual Debit", f"₹{body.amount} · debited for {(body.note or 'Manual debit by admin')[:60]} · {fmt_when()}", "warning")
     await telegram_send(
         f"<b>📤 Manual Debit</b>\nAmount: <b>₹{body.amount}</b>\nRef: <code>{tx['ref_id']}</code>",
         user_chat=user.get("telegram_chat_id"),
@@ -1272,12 +1272,16 @@ async def _process_wd(wid: str, action: str, note: str, admin_id: str):
     }})
     await db.transactions.update_many({"related_id": wid}, {"$set": {"status": new_status}})
     title_map = {"approved": "Withdrawal Approved", "rejected": "Withdrawal Rejected", "paid": "Withdrawal Paid"}
+    verb_map = {"approved": "approved for", "rejected": "rejected for", "paid": "paid via"}
     nt_map = {"approved": "info", "rejected": "warning", "paid": "success"}
     emoji_map = {"approved": "✅", "rejected": "❌", "paid": "💸"}
     user_doc = await db.users.find_one({"id": wd["user_id"]})
     if new_status in title_map:
+        verb = verb_map.get(new_status, new_status)
+        method = wd.get("method", "").upper()
+        suffix = f" · {note}" if note else ""
         await push_notification(wd["user_id"], title_map[new_status],
-                                f"₹{wd['amount']} via {wd.get('method','').upper()}{(' · ' + note) if note else ''} · {fmt_when()}", nt_map[new_status])
+                                f"₹{wd['amount']} · {verb} {method}{suffix} · {fmt_when()}", nt_map[new_status])
     await telegram_send(
         f"<b>{emoji_map.get(new_status, '')} Withdrawal {new_status.upper()}</b>\nAmount: <b>₹{wd['amount']}</b>\nMethod: {wd.get('method', '').upper()}",
         user_chat=(user_doc or {}).get("telegram_chat_id"),
