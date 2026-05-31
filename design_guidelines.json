@@ -1,0 +1,131 @@
+{
+  "theme": "Light & Dark Mode (Monochrome Trust & Premium Swiss)",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) blended with Premium Luxury",
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "Plus Jakarta Sans",
+    "mono_font": "JetBrains Mono",
+    "rules": [
+      "NEVER use Inter, Roboto, Open Sans, or Syne.",
+      "Headings must use tight letter spacing (tracking-tight).",
+      "Overlines and Labels MUST be Uppercase, Tiny (text-xs), Wide Spacing (tracking-[0.2em]).",
+      "Use JetBrains Mono specifically for financial balances, account numbers, and transaction IDs to ensure tabular alignment and a technical feel.",
+      "The jump between a heading and subheading must not exceed 2 Tailwind steps."
+    ]
+  },
+  "colors": {
+    "light_mode": {
+      "background": "#FFFFFF",
+      "surface": "#F9FAFB",
+      "border": "#E5E7EB",
+      "text_primary": "#0A0A0A",
+      "text_secondary": "#52525B",
+      "primary_action": "#0A0A0A",
+      "primary_action_text": "#FFFFFF",
+      "success": "#10B981",
+      "danger": "#EF4444",
+      "warning": "#F59E0B"
+    },
+    "dark_mode": {
+      "background": "#0A0A0A",
+      "surface": "#121212",
+      "border": "#27272A",
+      "text_primary": "#FAFAFA",
+      "text_secondary": "#A1A1AA",
+      "primary_action": "#FFFFFF",
+      "primary_action_text": "#0A0A0A",
+      "success": "#10B981",
+      "danger": "#EF4444",
+      "warning": "#F59E0B"
+    },
+    "rules": [
+      "STRICTLY NO purple, violet, teal green, or teal blue gradients.",
+      "Monochrome primary palette: Color is Function Only. The UI should be predominantly black, white, and greys.",
+      "Use Pure Emerald for Credits/Income and Signal Red for Debits/Withdrawals.",
+      "Never use pure #000000 or #808080. Tint greys slightly (e.g., slate/zinc)."
+    ]
+  },
+  "layout_and_spacing": {
+    "strategy": "The 'Control Room' Grid (Density, Data Correlation, Scanability)",
+    "rules": [
+      "Use Generous Spacing Philosophy: p-6 or p-8 inside cards to avoid text collision.",
+      "Base Grid: grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Tight gaps (gap-4 or gap-6).",
+      "Optical Alignment: Adjust padding if icons unbalance the text.",
+      "All grid items MUST be direct children.",
+      "Admin Panel requires persistent Left-Sidebar navigation with dense, grouped links.",
+      "Priority-first KPI row: Top of the dashboard must display the most critical metrics (Available Balance, Total Credits, Total Withdrawals, Pending Withdrawals)."
+    ]
+  },
+  "surface_strategy": {
+    "style": "Grid Borders (Technical Look) & Neumorphism (Tactile Crisp)",
+    "rules": [
+      "Cards: Flat background, 1px subtle border, no heavy drop shadows. Use border-collapse style layout for dense data.",
+      "Never apply generic soft UI globally.",
+      "For financial data clarity, use Flat Solid surfaces instead of Glassmorphism to ensure legibility."
+    ]
+  },
+  "components": {
+    "library": "Shadcn UI (Heavily customized)",
+    "icons": "Phosphor Icons (@phosphor-icons/react) for dense, professional dashboards",
+    "rules": [
+      "Do not build advanced interactions (datepickers, dialogs) from scratch; strictly use customized Shadcn.",
+      "Data tables must be dense but legible, utilizing Shadcn Table components.",
+      "Use Recharts for financial analytics charts.",
+      "All interactive elements MUST include data-testid attribute (e.g., data-testid='login-submit-button')."
+    ]
+  },
+  "media_and_images": {
+    "rules": [
+      "Do NOT use generic placeholder URLs (like via.placeholder.com). Use the provided image URLs below."
+    ],
+    "image_urls": {
+      "user_avatars": [
+        {
+          "url": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBjb3Jwb3JhdGUlMjBoZWFkc2hvdHxlbnwwfHx8fDE3ODAxMjg1MDh8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Professional female avatar"
+        },
+        {
+          "url": "https://images.pexels.com/photos/37148308/pexels-photo-37148308.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+          "description": "Professional male avatar"
+        }
+      ],
+      "hero_or_auth_background": [
+        {
+          "url": "https://images.unsplash.com/photo-1498262257252-c282316270bc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMG1pbmltYWwlMjBhcmNoaXRlY3R1cmUlMjBncmlkfGVufDB8fHx8MTc4MDI1OTQwNHww&ixlib=rb-4.1.0&q=85",
+          "description": "Abstract minimal architecture grid for auth screens"
+        }
+      ],
+      "card_mockups": [
+        {
+          "url": "https://images.unsplash.com/photo-1572798793517-03198986ca9e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBwcmVtaXVtJTIwYmxhY2slMjBjcmVkaXQlMjBjYXJkJTIwbW9ja3VwfGVufDB8fHx8MTc4MDI1OTQwM3ww&ixlib=rb-4.1.0&q=85",
+          "description": "Premium black credit card mockup for wallet/card features"
+        }
+      ],
+      "brand_logo": [
+        {
+          "url": "https://images.unsplash.com/photo-1764601841468-e85fd94de01e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMGxvZ28lMjBtaW5pbWFsJTIwYmxhY2slMjBhbmQlMjB3aGl0ZXxlbnwwfHx8fDE3ODAyNTk0MTZ8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Abstract black and white logo for DigiWallet V2"
+        }
+      ]
+    }
+  },
+  "motion_and_interactions": {
+    "rules": [
+      "Hover states must be explicitly set with high contrast.",
+      "Minimalist animations: Use micro-interactions for feedback (e.g., slight lift -translate-y-[1px]).",
+      "Transitions must specify properties, e.g., transition: transform 0.2s ease, opacity 0.2s ease."
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Install required fonts from Google Fonts: Outfit, Plus Jakarta Sans, JetBrains Mono.",
+    "Initialize Tailwind with provided color system and dark mode support (class strategy).",
+    "Install and configure @phosphor-icons/react for premium icon representation.",
+    "Implement Shadcn UI. Strictly adhere to customized flat cards (no heavy shadows, 1px subtle borders, no 'generic Vercel' look).",
+    "Create high-density data tables for the Super Admin panel.",
+    "Ensure the application strictly avoids gamification features (no spin wheels, scratch cards, MLM, etc.).",
+    "Apply data-testid to every interactive component.",
+    "Build the dashboard with the 'Control Room' bento grid pattern.",
+    "Implement the persistent left sidebar for the admin panel, keeping navigation easily scannable.",
+    "Set up UI toggles for Light / Dark themes using the specified monochrome color rules."
+  ]
+}
