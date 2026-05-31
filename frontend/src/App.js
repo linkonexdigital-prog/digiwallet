@@ -3,7 +3,6 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/lib/ThemeContext";
-import { Toaster } from "sonner";
 
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -20,6 +19,7 @@ import AdminLayout from "@/components/AdminLayout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminWithdrawals from "@/pages/admin/AdminWithdrawals";
+import AdminTransactions from "@/pages/admin/AdminTransactions";
 import AdminWallet from "@/pages/admin/AdminWallet";
 import AdminApi from "@/pages/admin/AdminApi";
 import AdminNotifications from "@/pages/admin/AdminNotifications";
@@ -52,7 +52,6 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Toaster position="top-right" theme="system"/>
           <Routes>
             <Route path="/" element={<Landing/>}/>
             <Route path="/login" element={<Login/>}/>
@@ -68,6 +67,7 @@ export default function App() {
             <Route path="/admin/users" element={<ProtectedAdmin><AdminUsers/></ProtectedAdmin>}/>
             <Route path="/admin/wallet" element={<ProtectedAdmin><AdminWallet/></ProtectedAdmin>}/>
             <Route path="/admin/withdrawals" element={<ProtectedAdmin><AdminWithdrawals/></ProtectedAdmin>}/>
+            <Route path="/admin/transactions" element={<ProtectedAdmin><AdminTransactions/></ProtectedAdmin>}/>
             <Route path="/admin/api" element={<ProtectedAdmin><AdminApi/></ProtectedAdmin>}/>
             <Route path="/admin/notifications" element={<ProtectedAdmin><AdminNotifications/></ProtectedAdmin>}/>
             <Route path="/admin/security" element={<ProtectedAdmin><AdminSecurity/></ProtectedAdmin>}/>

@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
-import { toast } from "sonner";
+import { ensureSWRegistered } from "@/lib/webPush";
 
 /**
- * Background notification poller. Watches for NEW notifications and:
- *  - shows in-app toast (sonner)
- *  - fires native Browser Notification (if permission granted)
- * Returns: { unread, requestPermission, permission }
+ * Powerful live notification poller.
+ *  - NO in-app toast (user explicitly disabled).
+ *  - Fires native browser/OS notification via Service Worker (so it works in background).
+ *  - Falls back to plain Notification API when SW not available.
+ *  - Auto-requests permission once on first visit.
+ *  - 5s polling for near-real-time delivery.
+ *  - Plays a subtle sound on every new alert.
+ *  - Marks notifications as requireInteraction so they don't auto-dismiss.
  */
 export function useLiveNotifications(enabled = true) {
   const [unread, setUnread] = useState(0);
@@ -22,48 +26,93 @@ export function useLiveNotifications(enabled = true) {
     return p;
   };
 
+  const showNotification = async (n) => {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const opts = {
+      body: n.message,
+      tag: n.id,
+      icon: "/favicon.ico",
+      badge: "/favicon.ico",
+      requireInteraction: true,
+      silent: false,
+      vibrate: [200, 100, 200, 100, 200],
+      data: { url: "/app/notifications", id: n.id },
+    };
+    // Prefer SW (works even when tab is in background)
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.showNotification) {
+        await reg.showNotification(n.title, opts);
+        playPing();
+        return;
+      }
+    } catch (_) {}
+    // Fallback: page-level notification
+    try {
+      const bn = new Notification(n.title, opts);
+      bn.onclick = () => { window.focus(); window.location.href = "/app/notifications"; };
+      playPing();
+    } catch (_) {}
+  };
+
+  // Simple WebAudio ping (subtle confirm sound)
+  const playPing = () => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ac = new Ctx();
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.type = "sine"; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.35);
+      o.start(); o.stop(ac.currentTime + 0.4);
+      setTimeout(() => { try { ac.close(); } catch (_){} }, 600);
+    } catch (_) {}
+  };
+
+  // Ensure SW is registered ASAP
+  useEffect(() => { ensureSWRegistered(); }, []);
+
+  // Auto-request permission once
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission !== "default") return;
+    if (localStorage.getItem("dw_perm_asked") === "1") return;
+    const t = setTimeout(async () => {
+      localStorage.setItem("dw_perm_asked", "1");
+      await requestPermission();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [enabled]);
+
+  // Polling
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
     const tick = async () => {
       try {
-        const r = await api.get("/notifications", { params: { limit: 20 } });
+        const r = await api.get("/notifications", { params: { limit: 25 } });
         if (!alive) return;
         const items = r.data.items || [];
         setUnread(r.data.unread || 0);
-        // First tick: seed seen set without firing toasts
         if (!initialized.current) {
           items.forEach((n) => seenIds.current.add(n.id));
           initialized.current = true;
           return;
         }
-        // Newer first; iterate oldest-of-the-new first
         const fresh = items.filter((n) => !seenIds.current.has(n.id)).reverse();
-        fresh.forEach((n) => {
+        for (const n of fresh) {
           seenIds.current.add(n.id);
-          // toast
-          const fn = n.type === "success" ? toast.success
-                    : n.type === "warning" ? toast.warning
-                    : n.type === "error" ? toast.error
-                    : toast;
-          fn(n.title, { description: n.message, duration: 6000 });
-          // browser notification
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            try {
-              const bn = new Notification(n.title, {
-                body: n.message,
-                tag: n.id,
-                icon: "/favicon.ico",
-                silent: false,
-              });
-              bn.onclick = () => { window.focus(); };
-            } catch (_) {}
-          }
-        });
+          await showNotification(n);
+        }
       } catch (_) {}
     };
     tick();
-    const i = setInterval(tick, 10000);
+    const i = setInterval(tick, 5000); // 5s for near-real-time
     return () => { alive = false; clearInterval(i); };
   }, [enabled]);
 

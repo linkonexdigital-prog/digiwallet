@@ -1428,6 +1428,117 @@ async def admin_telegram_test():
     await telegram_send("<b>Test Alert</b>\nDigiWallet V2 Telegram integration is working ✅")
     return {"ok": True}
 
+@admin_router.get("/transactions")
+async def admin_transactions(
+    q: Optional[str] = None,
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    user_id: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    limit: int = 100,
+    skip: int = 0,
+):
+    filt = {}
+    if type: filt["type"] = type
+    if status: filt["status"] = status
+    if user_id: filt["user_id"] = user_id
+    if min_amount is not None or max_amount is not None:
+        a = {}
+        if min_amount is not None: a["$gte"] = min_amount
+        if max_amount is not None: a["$lte"] = max_amount
+        filt["amount"] = a
+    if from_date or to_date:
+        d = {}
+        if from_date: d["$gte"] = from_date
+        if to_date: d["$lte"] = to_date
+        filt["created_at"] = d
+    if q:
+        filt["$or"] = [
+            {"description": {"$regex": q, "$options": "i"}},
+            {"ref_id": {"$regex": q, "$options": "i"}},
+            {"external_txn_id": {"$regex": q, "$options": "i"}},
+            {"id": q},
+        ]
+    items = await db.transactions.find(filt, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Enrich with user info
+    uids = list({i["user_id"] for i in items if i.get("user_id")})
+    users = await db.users.find({"id": {"$in": uids}}, {"_id": 0, "id": 1, "full_name": 1, "mobile_number": 1}).to_list(len(uids))
+    umap = {u["id"]: u for u in users}
+    for it in items:
+        u = umap.get(it.get("user_id"))
+        if u:
+            it["user_name"] = u["full_name"]
+            it["user_mobile"] = u["mobile_number"]
+    total = await db.transactions.count_documents(filt)
+    # Summary stats
+    summary = await db.transactions.aggregate([
+        {"$match": filt},
+        {"$group": {"_id": "$type", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(50)
+    return {"items": items, "total": total, "summary": summary}
+
+@admin_router.get("/transactions/{tx_id}")
+async def admin_transaction_detail(tx_id: str):
+    tx = await db.transactions.find_one({"id": tx_id}, {"_id": 0})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Not found")
+    user = await db.users.find_one({"id": tx.get("user_id")}, {"_id": 0, "password_hash": 0})
+    # related api log
+    log = None
+    if tx.get("external_txn_id"):
+        log = await db.api_logs.find_one({"txn_id": tx["id"]}, {"_id": 0})
+    related_wd = None
+    if tx.get("related_id"):
+        related_wd = await db.withdrawals.find_one({"id": tx["related_id"]}, {"_id": 0})
+    admin_user = None
+    if tx.get("admin_id"):
+        au = await db.users.find_one({"id": tx["admin_id"]}, {"_id": 0, "full_name": 1, "mobile_number": 1})
+        admin_user = au
+    return {"transaction": tx, "user": user, "api_log": log, "related_withdrawal": related_wd, "admin": admin_user}
+
+@admin_router.get("/transactions/export")
+async def admin_transactions_export(
+    type: Optional[str] = None, status: Optional[str] = None,
+    from_date: Optional[str] = None, to_date: Optional[str] = None,
+):
+    filt = {}
+    if type: filt["type"] = type
+    if status: filt["status"] = status
+    if from_date or to_date:
+        d = {}
+        if from_date: d["$gte"] = from_date
+        if to_date: d["$lte"] = to_date
+        filt["created_at"] = d
+    items = await db.transactions.find(filt, {"_id": 0}).sort("created_at", -1).to_list(50000)
+    import io, csv
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref_id", "id", "user_id", "type", "amount", "status", "description", "external_txn_id", "created_at"])
+    for it in items:
+        w.writerow([it.get("ref_id"), it.get("id"), it.get("user_id"), it.get("type"),
+                    it.get("amount"), it.get("status"), it.get("description"),
+                    it.get("external_txn_id"), it.get("created_at")])
+    return Response(content=out.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=transactions.csv"})
+
+class TxUpdateReq(BaseModel):
+    description: Optional[str] = None
+    status: Optional[str] = None
+    flagged: Optional[bool] = None
+    admin_note: Optional[str] = None
+
+@admin_router.patch("/transactions/{tx_id}")
+async def admin_update_transaction(tx_id: str, body: TxUpdateReq, admin: dict = Depends(require_admin)):
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(status_code=400, detail="No changes")
+    await db.transactions.update_one({"id": tx_id}, {"$set": data})
+    return {"ok": True}
+
+
 # Register routers
 api.include_router(admin_router)
 app.include_router(api)

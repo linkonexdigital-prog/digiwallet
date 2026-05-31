@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useTheme } from "@/lib/ThemeContext";
 import {
   Wallet, ChartLine, UsersThree, Bank, Coin, Key, Bell, ShieldCheck,
-  Gear, SignOut, Sun, Moon, List, X, User as UserIcon, Megaphone
+  Gear, SignOut, Sun, Moon, List, X, User as UserIcon, Megaphone, Receipt
 } from "@phosphor-icons/react";
 
 const navGroups = [
@@ -13,6 +13,7 @@ const navGroups = [
   ]},
   { label: "Operations", items: [
     { to: "/admin/users", label: "Users", icon: UsersThree },
+    { to: "/admin/transactions", label: "Transactions", icon: Receipt },
     { to: "/admin/wallet", label: "Wallet Ops", icon: Coin },
     { to: "/admin/withdrawals", label: "Withdrawals", icon: Bank },
   ]},

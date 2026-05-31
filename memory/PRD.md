@@ -85,3 +85,27 @@ See `/app/memory/test_credentials.md`.
 - `POST /api/auth/telegram/test` — send test message to user's chat
 - `PATCH /api/admin/settings { color_theme: monochrome|emerald|cobalt }` — site-wide theme switch
 - `GET /api/admin/dashboard` now includes `chart_7d` (array of 7 daily totals)
+
+---
+
+## v2.2 Update (Jan 2026)
+
+### Added
+- **Disabled in-app popup toasts** — notifications now ONLY use native browser/OS notification (Service Worker `showNotification`) for less intrusive experience.
+- **Persistent push notifications** — `requireInteraction: true`, vibrate pattern, sound ping — won't auto-dismiss until user clicks.
+- **Faster polling** (5s) + auto-request permission once on first visit so users don't miss alerts.
+- **Welcome greeting on user dashboard** — time-aware ("Good morning/afternoon/evening/night, [FirstName]") with first name in brand-gradient. Date overline with Sparkle icon.
+- **3 Quick-action cards** on user dashboard — Withdraw / View transactions / Alerts & security with hover animations.
+- **New Admin → Transactions section** at `/admin/transactions`:
+  - 4 summary stats (records, credit volume, withdrawal volume, adjustments)
+  - 7 filters: search, type, status, date range, amount range
+  - Click-to-open detail drawer with user info, external API metadata, linked withdrawal, processing admin
+  - Edit description / admin note / flag as suspicious
+  - One-click **Reverse** transaction (for credit/debit)
+  - **Export CSV** with current filters applied
+
+### API additions
+- `GET /api/admin/transactions` with rich filters (q, type, status, user_id, min/max amount, from/to date)
+- `GET /api/admin/transactions/{id}` — detail + user + api_log + related_withdrawal + admin
+- `GET /api/admin/transactions/export` — CSV export
+- `PATCH /api/admin/transactions/{id}` — update description, status, flagged, admin_note
